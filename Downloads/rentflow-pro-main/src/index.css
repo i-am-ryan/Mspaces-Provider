@@ -1,0 +1,157 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Rental Management System Design System
+   Professional SaaS design with clear status indicators
+   All colors in HSL format */
+
+@layer base {
+  :root {
+    /* Base colors - Light gray background for SaaS feel */
+    --background: 220 14% 96%;
+    --foreground: 222 47% 11%;
+
+    /* Cards - Pure white with contrast */
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    /* Popover */
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Primary - Professional Blue */
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Light blue tint */
+    --secondary: 214 32% 91%;
+    --secondary-foreground: 222 47% 11%;
+
+    /* Muted */
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    /* Accent */
+    --accent: 214 32% 91%;
+    --accent-foreground: 222 47% 11%;
+
+    /* Status Colors */
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Info */
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+
+    /* Borders and inputs */
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 217 91% 60%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar - Darker for contrast */
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 214 32% 91%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 47% 15%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 222 47% 18%;
+    --sidebar-ring: 217 91% 60%;
+    --sidebar-muted: 220 9% 46%;
+
+    /* Chart colors */
+    --chart-1: 217 91% 60%;
+    --chart-2: 160 84% 39%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 0 84% 60%;
+    --chart-5: 280 65% 60%;
+  }
+
+  .dark {
+    --background: 222 47% 11%;
+    --foreground: 214 32% 91%;
+
+    --card: 222 47% 15%;
+    --card-foreground: 214 32% 91%;
+
+    --popover: 222 47% 15%;
+    --popover-foreground: 214 32% 91%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 47% 18%;
+    --secondary-foreground: 214 32% 91%;
+
+    --muted: 222 47% 18%;
+    --muted-foreground: 220 9% 60%;
+
+    --accent: 222 47% 18%;
+    --accent-foreground: 214 32% 91%;
+
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 222 47% 18%;
+    --input: 222 47% 18%;
+    --ring: 217 91% 60%;
+
+    --sidebar-background: 222 47% 8%;
+    --sidebar-foreground: 214 32% 91%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 47% 12%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 222 47% 15%;
+    --sidebar-ring: 217 91% 60%;
+    --sidebar-muted: 220 9% 46%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-sm;
+  }
+  
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(230 80% 55%) 100%);
+  }
+  
+  .gradient-success {
+    background: linear-gradient(135deg, hsl(160 84% 39%) 0%, hsl(152 76% 45%) 100%);
+  }
+  
+  .shadow-card {
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  }
+  
+  .shadow-card-hover {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+}
