@@ -1,66 +1,75 @@
 import { useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 
 export function AuthCallback() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // Get the hash from URL
+        // Supabase redirects with tokens in URL hash after email verification
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
 
         if (accessToken && refreshToken) {
-          // Set the session
-          const { data, error } = await supabase.auth.setSession({
+          // Set the session with the tokens
+          const { error: sessionError } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
 
-          if (error) throw error;
-
-          // Get user role from profile
-          if (data.user) {
-            const { data: profile, error: profileError } = await supabase
-              .from('profiles')
-              .select('role')
-              .eq('id', data.user.id)
-              .single();
-
-            if (profileError) throw profileError;
-
-            // Redirect based on role
-            const redirectPath = profile.role === 'landlord' ? '/landlord' : '/tenant';
-            navigate(redirectPath, { replace: true });
+          if (sessionError) {
+            console.error('Session error:', sessionError);
+            navigate('/login?error=session_failed', { replace: true });
             return;
           }
+
+          // Get current user
+          const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+          if (userError || !user) {
+            console.error('User error:', userError);
+            navigate('/login?error=user_not_found', { replace: true });
+            return;
+          }
+
+          // Get user role from profile
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+
+          if (profileError) {
+            console.error('Profile error:', profileError);
+            navigate('/login?error=profile_not_found', { replace: true });
+            return;
+          }
+
+          // Redirect based on role
+          const redirectPath = profile.role === 'landlord' ? '/landlord' : '/tenant';
+          navigate(redirectPath, { replace: true });
+          return;
         }
 
-        // Fallback
-        const next = searchParams.get('next');
-        if (next) {
-          navigate(next, { replace: true });
-        } else {
-          navigate('/login', { replace: true });
-        }
+        // No tokens found, redirect to login
+        navigate('/login', { replace: true });
       } catch (error) {
         console.error('Auth callback error:', error);
-        navigate('/login', { replace: true });
+        navigate('/login?error=callback_failed', { replace: true });
       }
     };
 
     handleCallback();
-  }, [navigate, searchParams]);
+  }, [navigate]);
 
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="text-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
-        <p className="text-muted-foreground">Verifying your email...</p>
+        <p className="text-muted-foreground">Signing you in...</p>
       </div>
     </div>
   );
