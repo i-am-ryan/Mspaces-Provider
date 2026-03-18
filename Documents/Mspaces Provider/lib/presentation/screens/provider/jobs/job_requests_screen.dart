@@ -63,7 +63,9 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
     }
   }
 
-  void _showDeclineDialog(String bookingId, String clientName) {
+  void _showDeclineDialog(Map<String, dynamic> request) {
+    final bookingId = request['id'] as String? ?? '';
+    final clientName = request['clientName'] as String? ?? 'Client';
     String selectedReason = 'Schedule conflict';
     final reasons = [
       'Schedule conflict',
@@ -167,6 +169,14 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
     return ts.toString();
   }
 
+  String _formatTime(dynamic ts) {
+    if (ts == null) return 'TBD';
+    if (ts is Timestamp) {
+      return DateFormat('HH:mm').format(ts.toDate());
+    }
+    return ts.toString();
+  }
+
   String _formatAmount(dynamic v) {
     if (v == null) return 'TBD';
     final n =
@@ -174,7 +184,7 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
     return 'R${n.toStringAsFixed(0)}';
   }
 
-  Color _urgencyColor(String? urgency) {
+  Color _getUrgencyColor(String? urgency) {
     switch (urgency) {
       case 'emergency':
         return Colors.red;
@@ -302,9 +312,405 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
     );
   }
 
+  void _showRequestDetails(Map<String, dynamic> request) {
+    final clientName = request['clientName'] as String? ?? 'Client';
+    final service = request['serviceCategory'] as String?
+        ?? request['service'] as String?
+        ?? request['serviceType'] as String?
+        ?? 'Service';
+    final description = request['serviceDescription'] as String?
+        ?? request['description'] as String?
+        ?? 'No description provided';
+    final location = request['address'] as String?
+        ?? request['location'] as String?
+        ?? 'Location TBD';
+    final urgency = request['urgency'] as String? ?? 'normal';
+    final amount = request['estimatedPrice'] ?? request['amount'] ?? 600;
+    final clientPhone = request['clientPhone'] as String? ?? '';
+
+    final imageUrls = <String>[];
+    final rawUrls = request['imageUrls'] ?? request['photos'];
+    if (rawUrls is List) {
+      imageUrls.addAll(
+          rawUrls.map((e) => e.toString()).where((e) => e.isNotEmpty));
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (ctx, scroll) => SingleChildScrollView(
+          controller: scroll,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              const Text('Booking Request',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text('Review all details before responding',
+                  style: TextStyle(color: Colors.grey[500])),
+              const SizedBox(height: 20),
+
+              // Client card
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.grey[200]!),
+                ),
+                child: Row(children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: Colors.black,
+                    child: Text(
+                      clientName.trim().isNotEmpty
+                          ? clientName
+                              .trim()
+                              .split(' ')
+                              .where((w) => w.isNotEmpty)
+                              .take(2)
+                              .map((w) => w[0].toUpperCase())
+                              .join()
+                          : 'C',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(clientName,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 17)),
+                        if (clientPhone.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Row(children: [
+                            Icon(Icons.phone,
+                                size: 13, color: Colors.grey[600]),
+                            const SizedBox(width: 4),
+                            Text(clientPhone,
+                                style: TextStyle(
+                                    color: Colors.grey[600], fontSize: 13)),
+                          ]),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: _getUrgencyColor(urgency),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      urgency[0].toUpperCase() + urgency.substring(1),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 20),
+
+              // Details grid
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.grey[200]!),
+                ),
+                child: Column(children: [
+                  _detailRow(Icons.build_outlined, 'Service', service),
+                  const Divider(height: 20),
+                  _detailRow(Icons.calendar_today, 'Date',
+                      _formatDate(request['scheduledDate'])),
+                  const Divider(height: 20),
+                  _detailRow(
+                      Icons.access_time,
+                      'Time',
+                      request['scheduledTime'] as String? ??
+                          _formatTime(request['scheduledDate'])),
+                  const Divider(height: 20),
+                  _detailRow(Icons.location_on, 'Location', location),
+                  const Divider(height: 20),
+                  _detailRow(
+                      Icons.payments_outlined, 'Amount', 'R$amount'),
+                ]),
+              ),
+              const SizedBox(height: 20),
+
+              // Description
+              const Text('Description',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[200]!),
+                ),
+                child: Text(description,
+                    style: TextStyle(
+                        color: Colors.grey[800], height: 1.6, fontSize: 14)),
+              ),
+              const SizedBox(height: 20),
+
+              // Photos
+              if (imageUrls.isNotEmpty) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Client Photos',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w600)),
+                    Text(
+                        '${imageUrls.length} photo'
+                        '${imageUrls.length > 1 ? "s" : ""}',
+                        style: TextStyle(
+                            color: Colors.grey[500], fontSize: 13)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 110,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: imageUrls.length,
+                    itemBuilder: (ctx, i) => GestureDetector(
+                      onTap: () => _viewNetworkImage(imageUrls[i]),
+                      child: Container(
+                        width: 110,
+                        height: 110,
+                        margin: const EdgeInsets.only(right: 10),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[200]!),
+                          image: DecorationImage(
+                            image: NetworkImage(imageUrls[i]),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        child: Stack(children: [
+                          Positioned(
+                            bottom: 6,
+                            right: 6,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.5),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.zoom_in,
+                                  color: Colors.white, size: 14),
+                            ),
+                          ),
+                        ]),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+
+              if (imageUrls.isEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Row(children: [
+                    Icon(Icons.image_not_supported,
+                        color: Colors.grey[400], size: 18),
+                    const SizedBox(width: 8),
+                    Text('No photos attached',
+                        style: TextStyle(
+                            color: Colors.grey[500], fontSize: 13)),
+                  ]),
+                ),
+                const SizedBox(height: 20),
+              ],
+
+              // Accept / Decline buttons
+              Row(children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side:
+                          const BorderSide(color: Colors.red, width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.close, size: 18),
+                    label: const Text('Decline',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600)),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _showDeclineDialog(request);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.check, size: 18),
+                    label: const Text('Accept',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600)),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _showAcceptDialog(request);
+                    },
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _detailRow(IconData icon, String label, String value) {
+    return Row(children: [
+      Icon(icon, size: 18, color: Colors.grey[600]),
+      const SizedBox(width: 10),
+      Text('$label: ',
+          style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+      Expanded(
+        child: Text(value,
+            style:
+                const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            textAlign: TextAlign.right,
+            overflow: TextOverflow.ellipsis),
+      ),
+    ]);
+  }
+
+  void _viewNetworkImage(String url) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(children: [
+          Center(
+            child: InteractiveViewer(
+              child: Image.network(
+                url,
+                fit: BoxFit.contain,
+                loadingBuilder: (ctx, child, progress) => progress == null
+                    ? child
+                    : const Center(
+                        child: CircularProgressIndicator(
+                            color: Colors.white)),
+                errorBuilder: (ctx, e, s) => const Center(
+                    child: Icon(Icons.broken_image,
+                        color: Colors.white, size: 48)),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 40,
+            right: 16,
+            child: GestureDetector(
+              onTap: () => Navigator.pop(ctx),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close,
+                    color: Colors.white, size: 20),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  void _showAcceptDialog(Map<String, dynamic> request) {
+    final bookingId = request['id'] as String? ?? '';
+    final clientName = request['clientName'] as String? ?? 'Client';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Accept Job'),
+        content: Text('Accept the job request from $clientName?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel',
+                style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _acceptJob(bookingId);
+            },
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white),
+            child: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildRequestCard(QueryDocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
     final bookingId = doc.id;
+    final request = {'id': bookingId, ...d};
     final clientName = d['clientName'] as String? ?? 'Unknown Client';
     final serviceCategory =
         d['serviceCategory'] ?? d['service'] ?? d['serviceType'] ?? 'Service';
@@ -315,9 +721,11 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
     final dateStr = _formatDate(d['scheduledDate']);
     final description = d['serviceDescription'] ?? d['description'] ?? '';
     final isUrgent = urgency == 'urgent' || urgency == 'emergency';
-    final urgencyColor = _urgencyColor(urgency);
+    final urgencyColor = _getUrgencyColor(urgency);
 
-    return Container(
+    return GestureDetector(
+      onTap: () => _showRequestDetails(request),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -437,7 +845,7 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () =>
-                            _showDeclineDialog(bookingId, clientName),
+                            _showDeclineDialog(request),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.red,
                           side: const BorderSide(color: Colors.red),
@@ -476,6 +884,7 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
           ),
         ],
       ),
+    ),
     );
   }
 
