@@ -15,7 +15,6 @@ import '../../presentation/screens/provider/jobs/job_history_screen.dart';
 import '../../presentation/screens/provider/jobs/accept_job_screen.dart';
 import '../../presentation/screens/provider/schedule/provider_calendar_screen.dart';
 import '../../presentation/screens/provider/schedule/availability_settings_screen.dart';
-import '../../presentation/screens/provider/schedule/schedule_detail_screen.dart';
 import '../../presentation/screens/provider/earnings/provider_earnings_screen.dart';
 import '../../presentation/screens/provider/earnings/transactions_screen.dart';
 import '../../presentation/screens/provider/earnings/payout_settings_screen.dart';
@@ -145,11 +144,6 @@ class AppRouter {
         path: '/provider-availability',
         name: 'provider-availability',
         builder: (context, state) => const AvailabilitySettingsScreen(),
-      ),
-      GoRoute(
-        path: '/provider-schedule-detail',
-        name: 'provider-schedule-detail',
-        builder: (context, state) => const ScheduleDetailScreen(),
       ),
 
       // ── Earnings ────────────────────────────────────────────────

@@ -137,6 +137,16 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         'completedAt': FieldValue.serverTimestamp(),
       });
 
+      // Update provider job count
+      await FirebaseFirestore.instance
+          .collection('service_providers')
+          .doc(_uid)
+          .update({
+        'completedJobs': FieldValue.increment(1),
+        'totalJobsCompleted': FieldValue.increment(1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
 // Generate completion invoice via Cloud Function
       try {
         final callable = FirebaseFunctions.instanceFor(region: 'europe-west4')

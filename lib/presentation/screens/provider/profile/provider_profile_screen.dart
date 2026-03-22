@@ -1,5 +1,9 @@
 import 'dart:async';
 
+import 'dart:io';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -22,24 +26,28 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   Map<String, dynamic> _providerData = {};
   StreamSubscription<DocumentSnapshot>? _userSub;
   StreamSubscription<DocumentSnapshot>? _providerSub;
+  bool _isUploadingPhoto = false;
+  int _liveCompletedJobs = 0;
+  double _liveRating = 0.0;
+  int _totalReviews = 0;
+  List<Map<String, dynamic>> _reviews = [];
+  StreamSubscription<QuerySnapshot>? _bookingsSub;
+  StreamSubscription<QuerySnapshot>? _reviewsSub;
 
   String get _uid => _auth.currentUser?.uid ?? '';
 
-  String get _fullName =>
-      (_providerData['displayName'] ??
-              _userData['displayName'] ??
-              _auth.currentUser?.displayName ??
-              'Provider')
-          .toString();
+  String get _fullName => (_providerData['displayName'] ??
+          _userData['displayName'] ??
+          _auth.currentUser?.displayName ??
+          'Provider')
+      .toString();
 
-  String get _primaryService =>
-      (_providerData['primaryService'] ??
-              _providerData['serviceCategory'] ??
-              '')
-          .toString();
+  String get _primaryService => (_providerData['primaryService'] ??
+          _providerData['serviceCategory'] ??
+          '')
+      .toString();
 
-  String? get _profilePhotoUrl =>
-      _providerData['profilePhotoUrl'] as String?;
+  String? get _profilePhotoUrl => _providerData['profilePhotoUrl'] as String?;
 
   String get _serviceArea {
     final areas = _providerData['coverageAreas'] as List<dynamic>? ?? [];
@@ -51,8 +59,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   }
 
   List<String> _getServiceCategories() {
-    final cats =
-        _providerData['serviceCategories'] as List<dynamic>? ?? [];
+    final cats = _providerData['serviceCategories'] as List<dynamic>? ?? [];
     return cats.map((e) => e.toString()).toList();
   }
 
@@ -71,11 +78,8 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _userSub = _firestore
-        .collection('users')
-        .doc(_uid)
-        .snapshots()
-        .listen((snap) {
+    _userSub =
+        _firestore.collection('users').doc(_uid).snapshots().listen((snap) {
       if (mounted) {
         setState(() {
           _userData = snap.data() ?? {};
@@ -93,12 +97,53 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
         });
       }
     });
+    // Live completed jobs count
+    _bookingsSub = _firestore
+        .collection('bookings')
+        .where('providerId', isEqualTo: _uid)
+        .where('status', isEqualTo: 'completed')
+        .snapshots()
+        .listen((snap) {
+      if (mounted) setState(() => _liveCompletedJobs = snap.docs.length);
+    });
+
+// Live reviews
+    _reviewsSub = _firestore
+        .collection('reviews')
+        .where('providerId', isEqualTo: _uid)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .listen((snap) {
+      if (mounted) {
+        final reviewList = snap.docs.map((d) {
+          final data = d.data() as Map<String, dynamic>;
+          final comment = data['comment']?.toString() ??
+              data['comments']?.toString() ??
+              data['review']?.toString() ??
+              data['text']?.toString() ??
+              '';
+          return {'id': d.id, ...data, 'comment': comment};
+        }).toList();
+        double totalRating = 0;
+        for (final r in reviewList) {
+          totalRating += (r['rating'] as num?)?.toDouble() ?? 0;
+        }
+        setState(() {
+          _reviews = reviewList;
+          _totalReviews = reviewList.length;
+          _liveRating =
+              reviewList.isEmpty ? 0 : totalRating / reviewList.length;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _userSub?.cancel();
     _providerSub?.cancel();
+    _bookingsSub?.cancel();
+    _reviewsSub?.cancel();
     super.dispose();
   }
 
@@ -126,10 +171,9 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style:
-                ElevatedButton.styleFrom(backgroundColor: Colors.black),
-            child: const Text('Sign Out',
-                style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
+            child:
+                const Text('Sign Out', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -142,8 +186,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
 
   // ── GPS location helper ──────────────────────────────────────────────
 
-  Future<void> _getLocationAndFill(
-      TextEditingController controller) async {
+  Future<void> _getLocationAndFill(TextEditingController controller) async {
     try {
       LocationPermission perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
@@ -173,8 +216,8 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
       final position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
 
-      final placemarks = await placemarkFromCoordinates(
-          position.latitude, position.longitude);
+      final placemarks =
+          await placemarkFromCoordinates(position.latitude, position.longitude);
 
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
@@ -235,6 +278,51 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
     }
   }
 
+  Future<void> _pickAndUploadPhoto() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+        source: ImageSource.gallery, imageQuality: 80, maxWidth: 800);
+    if (picked == null) return;
+
+    setState(() => _isUploadingPhoto = true);
+    try {
+      final file = File(picked.path);
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('providers/$_uid/profile_photo.jpg');
+      final task = await ref.putFile(file);
+      final url = await task.ref.getDownloadURL();
+
+      await Future.wait([
+        _firestore.collection('service_providers').doc(_uid).update({
+          'profilePhotoUrl': url,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }),
+        _firestore.collection('users').doc(_uid).update({
+          'profilePhotoUrl': url,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }),
+      ]);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Profile photo updated!'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed to upload photo: $e'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
+  }
+
   // ── Public profile preview ───────────────────────────────────────────
 
   void _showPublicProfilePreview() {
@@ -252,180 +340,179 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
         expand: false,
         builder: (ctx, scroll) {
           final bio =
-              (_providerData['bio'] ?? _providerData['about'] ?? '')
-                  .toString();
+              (_providerData['bio'] ?? _providerData['about'] ?? '').toString();
           return SingleChildScrollView(
-          controller: scroll,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Drag handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
+            controller: scroll,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Drag handle
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
 
-              const Text('Your Public Profile',
-                  style: TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.bold)),
-              const Text('This is what clients and landlords see',
-                  style: TextStyle(color: Colors.grey)),
-              const SizedBox(height: 24),
+                const Text('Your Public Profile',
+                    style:
+                        TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const Text('This is what clients and landlords see',
+                    style: TextStyle(color: Colors.grey)),
+                const SizedBox(height: 24),
 
-              // Avatar + name row
-              Row(children: [
-                CircleAvatar(
-                  radius: 36,
-                  backgroundColor: Colors.black,
-                  backgroundImage: (_profilePhotoUrl != null &&
-                          _profilePhotoUrl!.isNotEmpty)
-                      ? NetworkImage(_profilePhotoUrl!)
-                      : null,
-                  child: (_profilePhotoUrl == null ||
-                          _profilePhotoUrl!.isEmpty)
-                      ? Text(
-                          _fullName.isNotEmpty
-                              ? _fullName[0].toUpperCase()
-                              : 'P',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(_fullName,
-                          style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold)),
-                      Text(_primaryService,
-                          style: TextStyle(
-                              color: Colors.grey[600], fontSize: 14)),
-                      Row(children: [
-                        const Icon(Icons.star,
-                            size: 16, color: Colors.amber),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${((_providerData['rating'] ?? 0.0) as num).toStringAsFixed(1)}'
-                          ' • ${_providerData['totalReviews'] ?? 0} reviews',
-                          style: TextStyle(
-                              color: Colors.grey[600], fontSize: 13),
-                        ),
-                      ]),
-                    ],
-                  ),
-                ),
-              ]),
-              const SizedBox(height: 20),
-
-              // Bio
-              if (bio.isNotEmpty) ...[
-                const Text('About',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 8),
-                Text(bio,
-                    style: TextStyle(
-                        color: Colors.grey[700], height: 1.5)),
-                const SizedBox(height: 16),
-              ],
-
-              // Services
-              const Text('Services',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _getServiceCategories()
-                    .map((cat) => Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.grey[300]!),
-                          ),
-                          child: Text(cat,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w500)),
-                        ))
-                    .toList(),
-              ),
-              const SizedBox(height: 16),
-
-              // Location
-              const Text('Location',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 8),
-              Row(children: [
-                Icon(Icons.location_on,
-                    color: Colors.grey[600], size: 18),
-                const SizedBox(width: 6),
-                Text(
-                  _serviceArea.isNotEmpty ? _serviceArea : 'Not set',
-                  style: TextStyle(color: Colors.grey[700]),
-                ),
-              ]),
-              const SizedBox(height: 16),
-
-              // Contact
-              const Text('Contact',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 8),
-              Row(children: [
-                Icon(Icons.phone, color: Colors.grey[600], size: 18),
-                const SizedBox(width: 6),
-                Text(
-                    (_providerData['phone'] ?? _userData['phone'] ?? 'Not set')
-                        .toString(),
-                    style: TextStyle(color: Colors.grey[700])),
-              ]),
-              const SizedBox(height: 6),
-              Row(children: [
-                Icon(Icons.email, color: Colors.grey[600], size: 18),
-                const SizedBox(width: 6),
-                Text(
-                    (_providerData['email'] ?? _userData['email'] ?? 'Not set')
-                        .toString(),
-                    style: TextStyle(color: Colors.grey[700])),
-              ]),
-              const SizedBox(height: 24),
-
-              // Close
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
+                // Avatar + name row
+                Row(children: [
+                  CircleAvatar(
+                    radius: 36,
                     backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                    backgroundImage: (_profilePhotoUrl != null &&
+                            _profilePhotoUrl!.isNotEmpty)
+                        ? NetworkImage(_profilePhotoUrl!)
+                        : null,
+                    child:
+                        (_profilePhotoUrl == null || _profilePhotoUrl!.isEmpty)
+                            ? Text(
+                                _fullName.isNotEmpty
+                                    ? _fullName[0].toUpperCase()
+                                    : 'P',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold),
+                              )
+                            : null,
                   ),
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Close Preview'),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_fullName,
+                            style: const TextStyle(
+                                fontSize: 20, fontWeight: FontWeight.bold)),
+                        Text(_primaryService,
+                            style: TextStyle(
+                                color: Colors.grey[600], fontSize: 14)),
+                        Row(children: [
+                          const Icon(Icons.star, size: 16, color: Colors.amber),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${((_providerData['rating'] ?? 0.0) as num).toStringAsFixed(1)}'
+                            ' • ${_providerData['totalReviews'] ?? 0} reviews',
+                            style: TextStyle(
+                                color: Colors.grey[600], fontSize: 13),
+                          ),
+                        ]),
+                      ],
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 20),
+
+                // Bio
+                if (bio.isNotEmpty) ...[
+                  const Text('About',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 8),
+                  Text(bio,
+                      style: TextStyle(color: Colors.grey[700], height: 1.5)),
+                  const SizedBox(height: 16),
+                ],
+
+                // Services
+                const Text('Services',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _getServiceCategories()
+                      .map((cat) => Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            child: Text(cat,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w500)),
+                          ))
+                      .toList(),
                 ),
-              ),
-            ],
-          ),
-        );
+                const SizedBox(height: 16),
+
+                // Location
+                const Text('Location',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 8),
+                Row(children: [
+                  Icon(Icons.location_on, color: Colors.grey[600], size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    _serviceArea.isNotEmpty ? _serviceArea : 'Not set',
+                    style: TextStyle(color: Colors.grey[700]),
+                  ),
+                ]),
+                const SizedBox(height: 16),
+
+                // Contact
+                const Text('Contact',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 8),
+                Row(children: [
+                  Icon(Icons.phone, color: Colors.grey[600], size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                      (_providerData['phone'] ??
+                              _userData['phone'] ??
+                              'Not set')
+                          .toString(),
+                      style: TextStyle(color: Colors.grey[700])),
+                ]),
+                const SizedBox(height: 6),
+                Row(children: [
+                  Icon(Icons.email, color: Colors.grey[600], size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                      (_providerData['email'] ??
+                              _userData['email'] ??
+                              'Not set')
+                          .toString(),
+                      style: TextStyle(color: Colors.grey[700])),
+                ]),
+                const SizedBox(height: 24),
+
+                // Close
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Close Preview'),
+                  ),
+                ),
+              ],
+            ),
+          );
         },
       ),
     );
@@ -435,13 +522,11 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
 
   void _showEditProfileDialog() {
     final bioCtrl = TextEditingController(
-        text: (_providerData['bio'] ?? _providerData['about'] ?? '')
-            .toString());
+        text:
+            (_providerData['bio'] ?? _providerData['about'] ?? '').toString());
     final phoneCtrl = TextEditingController(
-        text: (_providerData['phone'] ?? _userData['phone'] ?? '')
-            .toString());
-    final cityCtrl =
-        TextEditingController(text: _getCityFromProvider());
+        text: (_providerData['phone'] ?? _userData['phone'] ?? '').toString());
+    final cityCtrl = TextEditingController(text: _getCityFromProvider());
     String selectedProvince = _getProvinceFromProvider();
 
     showModalBottomSheet(
@@ -472,8 +557,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                 ),
               ),
               const Text('Edit Profile',
-                  style: TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.bold)),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
 
               // Bio
@@ -543,8 +627,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
               ]),
               const SizedBox(height: 4),
               Text('Tap 📍 to use your current location',
-                  style:
-                      TextStyle(color: Colors.grey[500], fontSize: 12)),
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12)),
               const SizedBox(height: 16),
 
               // Province
@@ -552,10 +635,8 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                   style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               StatefulBuilder(
-                builder: (ctx, setLocal) =>
-                    DropdownButtonFormField<String>(
-                  value:
-                      selectedProvince.isNotEmpty ? selectedProvince : null,
+                builder: (ctx, setLocal) => DropdownButtonFormField<String>(
+                  value: selectedProvince.isNotEmpty ? selectedProvince : null,
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12)),
@@ -574,11 +655,9 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                     'Free State',
                     'Northern Cape',
                   ]
-                      .map((p) =>
-                          DropdownMenuItem(value: p, child: Text(p)))
+                      .map((p) => DropdownMenuItem(value: p, child: Text(p)))
                       .toList(),
-                  onChanged: (v) =>
-                      setLocal(() => selectedProvince = v ?? ''),
+                  onChanged: (v) => setLocal(() => selectedProvince = v ?? ''),
                 ),
               ),
               const SizedBox(height: 24),
@@ -603,8 +682,8 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                     );
                   },
                   child: const Text('Save Changes',
-                      style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold)),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(height: 16),
@@ -628,12 +707,14 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
         (_providerData['phone'] ?? _userData['phone'] ?? '').toString();
     final bio =
         (_providerData['bio'] ?? _providerData['about'] ?? '').toString();
-    final rating = (_providerData['averageRating'] ??
-        _providerData['rating'] ??
-        0.0) as num;
-    final completedJobs = (_providerData['completedJobs'] ??
-        _providerData['totalJobs'] ??
-        0) as int;
+    final rating = _liveRating > 0
+        ? _liveRating
+        : (_providerData['averageRating'] ?? _providerData['rating'] ?? 0.0)
+            as num;
+    final completedJobs = _liveCompletedJobs > 0
+        ? _liveCompletedJobs
+        : (_providerData['completedJobs'] ?? _providerData['totalJobs'] ?? 0)
+            as int;
     final isAvailable = _providerData['isAvailable'] as bool? ?? false;
     final services = _getServiceCategories();
 
@@ -647,8 +728,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
         ),
         title: const Text('Profile',
-            style: TextStyle(
-                color: Colors.black, fontWeight: FontWeight.bold)),
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             onPressed: _signOut,
@@ -721,8 +801,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Text(bio,
-                      style: TextStyle(
-                          fontSize: 14, color: Colors.grey[700])),
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700])),
                 ),
               ]),
               const SizedBox(height: 16),
@@ -736,8 +815,8 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                   runSpacing: 8,
                   children: services
                       .map((s) => Chip(
-                            label: Text(s,
-                                style: const TextStyle(fontSize: 12)),
+                            label:
+                                Text(s, style: const TextStyle(fontSize: 12)),
                             backgroundColor: Colors.grey[100],
                           ))
                       .toList(),
@@ -749,8 +828,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
             // ── Location ───────────────────────────────────────────
             if (_serviceArea.isNotEmpty) ...[
               _buildInfoCard('Service Area', [
-                _infoRow(Icons.location_on_outlined,
-                    'Coverage', _serviceArea),
+                _infoRow(Icons.location_on_outlined, 'Coverage', _serviceArea),
               ]),
               const SizedBox(height: 16),
             ],
@@ -772,6 +850,12 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
               ),
             ),
             const SizedBox(height: 12),
+
+// ── Reviews ──
+            if (_reviews.isNotEmpty) ...[
+              _buildReviewsSection(),
+              const SizedBox(height: 16),
+            ],
 
             // ── Sign out ───────────────────────────────────────────
             SizedBox(
@@ -801,44 +885,66 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   Widget _buildHeaderSection(String email) {
     return Column(
       children: [
-        CircleAvatar(
-          radius: 48,
-          backgroundColor: Colors.black,
-          backgroundImage: (_profilePhotoUrl != null &&
-                  _profilePhotoUrl!.isNotEmpty)
-              ? NetworkImage(_profilePhotoUrl!)
-              : null,
-          child: (_profilePhotoUrl == null || _profilePhotoUrl!.isEmpty)
-              ? Text(
-                  _fullName.isNotEmpty ? _fullName[0].toUpperCase() : 'P',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold),
-                )
-              : null,
+        GestureDetector(
+          onTap: _pickAndUploadPhoto,
+          child: Stack(
+            children: [
+              CircleAvatar(
+                radius: 48,
+                backgroundColor: Colors.black,
+                backgroundImage:
+                    (_profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty)
+                        ? NetworkImage(_profilePhotoUrl!)
+                        : null,
+                child: (_profilePhotoUrl == null || _profilePhotoUrl!.isEmpty)
+                    ? Text(
+                        _fullName.isNotEmpty ? _fullName[0].toUpperCase() : 'P',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold),
+                      )
+                    : null,
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Colors.black,
+                    shape: BoxShape.circle,
+                  ),
+                  child: _isUploadingPhoto
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.camera_alt,
+                          color: Colors.white, size: 14),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         Text(_fullName,
-            style: const TextStyle(
-                fontSize: 22, fontWeight: FontWeight.bold)),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         if (_primaryService.isNotEmpty) ...[
           const SizedBox(height: 4),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
               color: Colors.grey[100],
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(_primaryService,
-                style: TextStyle(
-                    fontSize: 13, color: Colors.grey[700])),
+                style: TextStyle(fontSize: 13, color: Colors.grey[700])),
           ),
         ],
         const SizedBox(height: 4),
-        Text(email,
-            style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+        Text(email, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
       ],
     );
   }
@@ -854,27 +960,24 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _statItem(Icons.star_rounded, Colors.amber,
-              rating.toStringAsFixed(1), 'Rating'),
+          _statItem(Icons.star_rounded, Colors.amber, rating.toStringAsFixed(1),
+              'Rating'),
           Container(height: 40, width: 1, color: Colors.grey[300]),
-          _statItem(Icons.check_circle_outline, Colors.green,
-              '$completedJobs', 'Completed'),
+          _statItem(Icons.check_circle_outline, Colors.green, '$completedJobs',
+              'Completed'),
         ],
       ),
     );
   }
 
-  Widget _statItem(
-      IconData icon, Color color, String value, String label) {
+  Widget _statItem(IconData icon, Color color, String value, String label) {
     return Column(
       children: [
         Icon(icon, color: color, size: 22),
         const SizedBox(height: 4),
         Text(value,
-            style: const TextStyle(
-                fontSize: 18, fontWeight: FontWeight.bold)),
-        Text(label,
-            style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
       ],
     );
   }
@@ -886,9 +989,8 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
         color: isAvailable ? Colors.green.shade50 : Colors.grey[50],
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-            color: isAvailable
-                ? Colors.green.shade200
-                : const Color(0x1A000000)),
+            color:
+                isAvailable ? Colors.green.shade200 : const Color(0x1A000000)),
       ),
       child: Row(
         children: [
@@ -903,22 +1005,18 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isAvailable
-                      ? 'Available for Jobs'
-                      : 'Not Available',
+                  isAvailable ? 'Available for Jobs' : 'Not Available',
                   style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: isAvailable
-                          ? Colors.green[700]
-                          : Colors.grey[700]),
+                      color:
+                          isAvailable ? Colors.green[700] : Colors.grey[700]),
                 ),
                 Text(
                   isAvailable
                       ? 'You will receive new job requests'
                       : 'You will not receive new job requests',
-                  style:
-                      TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
             ),
@@ -943,17 +1041,15 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
         border: Border.all(color: const Color(0x1A000000)),
         boxShadow: const [
           BoxShadow(
-              color: Color(0x0D000000),
-              blurRadius: 8,
-              offset: Offset(0, 2))
+              color: Color(0x0D000000), blurRadius: 8, offset: Offset(0, 2))
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title,
-              style: const TextStyle(
-                  fontSize: 15, fontWeight: FontWeight.bold)),
+              style:
+                  const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           ...children,
         ],
@@ -972,8 +1068,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label,
-                  style:
-                      TextStyle(fontSize: 11, color: Colors.grey[500])),
+                  style: TextStyle(fontSize: 11, color: Colors.grey[500])),
               Text(value,
                   style: const TextStyle(
                       fontSize: 14, fontWeight: FontWeight.w500)),
@@ -981,6 +1076,199 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showAllReviews() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (ctx, scroll) => Column(children: [
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2)),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(children: [
+              const Text('All Reviews',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Spacer(),
+              Row(children: [
+                Icon(Icons.star, color: Colors.amber[600], size: 16),
+                const SizedBox(width: 4),
+                Text(_liveRating.toStringAsFixed(1),
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(' · $_totalReviews',
+                    style: TextStyle(color: Colors.grey[600])),
+              ]),
+            ]),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView.builder(
+              controller: scroll,
+              padding: const EdgeInsets.all(20),
+              itemCount: _reviews.length,
+              itemBuilder: (_, i) {
+                final review = _reviews[i];
+                final clientName = review['clientName']?.toString() ?? 'Client';
+                final rating = (review['rating'] as num?)?.toDouble() ?? 0;
+                final comment = review['comment']?.toString() ?? '';
+                final createdAt = (review['createdAt'] as Timestamp?)?.toDate();
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          CircleAvatar(
+                            radius: 16,
+                            backgroundColor: Colors.grey[300],
+                            child: Text(clientName[0].toUpperCase(),
+                                style: const TextStyle(
+                                    fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(clientName,
+                                style: const TextStyle(
+                                    fontSize: 13, fontWeight: FontWeight.w600)),
+                          ),
+                          Row(
+                              children: List.generate(
+                                  5,
+                                  (i) => Icon(
+                                        i < rating
+                                            ? Icons.star
+                                            : Icons.star_border,
+                                        size: 14,
+                                        color: Colors.amber[600],
+                                      ))),
+                        ]),
+                        if (comment.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(comment,
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey[700],
+                                  height: 1.4)),
+                        ],
+                        if (createdAt != null) ...[
+                          const SizedBox(height: 4),
+                          Text(DateFormat('dd MMM yyyy').format(createdAt),
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.grey[400])),
+                        ],
+                      ]),
+                );
+              },
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildReviewsSection() {
+    return _buildInfoCard(
+      'Reviews ($_totalReviews)',
+      [
+        Row(children: [
+          Icon(Icons.star, color: Colors.amber[600], size: 20),
+          const SizedBox(width: 6),
+          Text(
+            _liveRating.toStringAsFixed(1),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(width: 6),
+          Text(
+              'out of 5 · $_totalReviews review${_totalReviews == 1 ? '' : 's'}',
+              style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+        ]),
+        const SizedBox(height: 12),
+        ..._reviews.take(3).map((review) {
+          final clientName = review['clientName']?.toString() ?? 'Client';
+          final rating = (review['rating'] as num?)?.toDouble() ?? 0;
+          final comment = review['comment']?.toString() ?? '';
+          final createdAt = (review['createdAt'] as Timestamp?)?.toDate();
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Colors.grey[300],
+                  child: Text(clientName[0].toUpperCase(),
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(clientName,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600)),
+                ),
+                Row(
+                    children: List.generate(
+                        5,
+                        (i) => Icon(
+                              i < rating ? Icons.star : Icons.star_border,
+                              size: 14,
+                              color: Colors.amber[600],
+                            ))),
+              ]),
+              if (comment.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(comment,
+                    style: TextStyle(
+                        fontSize: 13, color: Colors.grey[700], height: 1.4)),
+              ],
+              if (createdAt != null) ...[
+                const SizedBox(height: 4),
+                Text(DateFormat('dd MMM yyyy').format(createdAt),
+                    style: TextStyle(fontSize: 11, color: Colors.grey[400])),
+              ],
+            ]),
+          );
+        }),
+        if (_reviews.length > 3) ...[
+          const SizedBox(height: 8),
+          Center(
+            child: TextButton(
+              onPressed: () => _showAllReviews(),
+              child: Text('See all $_totalReviews reviews',
+                  style: const TextStyle(
+                      color: Colors.black, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
