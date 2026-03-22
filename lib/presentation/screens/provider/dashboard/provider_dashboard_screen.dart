@@ -25,14 +25,13 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
   Stream<QuerySnapshot> get _pendingStream => FirebaseFirestore.instance
       .collection('bookings')
       .where('providerId', isEqualTo: _uid)
-      .where('status', isEqualTo: 'pending')
-      .snapshots();
+      .where('status',
+          whereIn: ['pending', 'pending_provider_confirmation']).snapshots();
 
   Stream<QuerySnapshot> get _activeStream => FirebaseFirestore.instance
       .collection('bookings')
       .where('providerId', isEqualTo: _uid)
-      .where('status', whereIn: ['accepted', 'in_progress'])
-      .snapshots();
+      .where('status', whereIn: ['accepted', 'in_progress']).snapshots();
 
   Stream<QuerySnapshot> get _earningsStream => FirebaseFirestore.instance
       .collection('transactions')
@@ -65,8 +64,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
       if (ts.toDate().isBefore(weekStart)) continue;
       final v = d['amount'];
       if (v != null) {
-        total +=
-            (v is num) ? v.toDouble() : double.tryParse(v.toString()) ?? 0;
+        total += (v is num) ? v.toDouble() : double.tryParse(v.toString()) ?? 0;
       }
     }
     return total;
@@ -134,8 +132,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     return StreamBuilder<DocumentSnapshot>(
       stream: _providerStream,
       builder: (context, provSnap) {
-        final provider =
-            provSnap.data?.data() as Map<String, dynamic>? ?? {};
+        final provider = provSnap.data?.data() as Map<String, dynamic>? ?? {};
         final displayName = provider['displayName'] as String? ??
             FirebaseAuth.instance.currentUser?.displayName ??
             'Provider';
@@ -144,8 +141,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
         return StreamBuilder<QuerySnapshot>(
           stream: _pendingStream,
           builder: (context, pendingSnap) {
-            final pendingDocs = List<QueryDocumentSnapshot>.from(
-                pendingSnap.data?.docs ?? []);
+            final pendingDocs =
+                List<QueryDocumentSnapshot>.from(pendingSnap.data?.docs ?? []);
 
             return StreamBuilder<QuerySnapshot>(
               stream: _activeStream,
@@ -170,11 +167,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                             Expanded(
                               child: SingleChildScrollView(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _buildHeroBanner(
-                                        displayName, isAvailable),
+                                    _buildHeroBanner(displayName, isAvailable),
                                     Padding(
                                       padding: const EdgeInsets.all(20),
                                       child: Column(
@@ -184,17 +179,14 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                                           _buildStatsCards(
                                             todayCount: todayDocs.length,
                                             weekEarnings: weekTotal,
-                                            pendingCount:
-                                                pendingDocs.length,
+                                            pendingCount: pendingDocs.length,
                                           ),
                                           const SizedBox(height: 24),
                                           _buildQuickActions(),
                                           const SizedBox(height: 24),
-                                          _buildPendingSection(
-                                              pendingDocs),
+                                          _buildPendingSection(pendingDocs),
                                           const SizedBox(height: 24),
-                                          _buildTodayScheduleSection(
-                                              todayDocs),
+                                          _buildTodayScheduleSection(todayDocs),
                                         ],
                                       ),
                                     ),
@@ -229,16 +221,15 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
               CircleAvatar(
                 radius: 24,
                 backgroundColor: Colors.grey[300],
-                child: const Icon(Icons.person,
-                    size: 24, color: Colors.black54),
+                child:
+                    const Icon(Icons.person, size: 24, color: Colors.black54),
               ),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Welcome back,',
-                      style:
-                          TextStyle(fontSize: 12, color: Colors.grey[600])),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                   Text(displayName,
                       style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.bold)),
@@ -251,8 +242,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
               GestureDetector(
                 onTap: () => _toggleAvailability(isAvailable),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: isAvailable ? Colors.green : Colors.grey[400],
                     borderRadius: BorderRadius.circular(20),
@@ -280,8 +271,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                 ),
               ),
               IconButton(
-                onPressed: () =>
-                    context.push('/provider-notifications'),
+                onPressed: () => context.push('/provider-notifications'),
                 icon: const Icon(Icons.notifications_outlined, size: 24),
               ),
             ],
@@ -344,8 +334,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                 ),
                 const SizedBox(height: 4),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: isAvailable ? Colors.green : Colors.grey,
                     borderRadius: BorderRadius.circular(12),
@@ -354,9 +344,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        isAvailable
-                            ? Icons.check_circle
-                            : Icons.pause_circle,
+                        isAvailable ? Icons.check_circle : Icons.pause_circle,
                         size: 14,
                         color: Colors.white,
                       ),
@@ -463,11 +451,10 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
           ),
           const SizedBox(height: 12),
           Text(value,
-              style: const TextStyle(
-                  fontSize: 24, fontWeight: FontWeight.bold)),
+              style:
+                  const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          Text(title,
-              style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          Text(title, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
         ],
       ),
     );
@@ -532,8 +519,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
             Icon(icon, size: 24, color: Colors.black),
             const SizedBox(height: 8),
             Text(label,
-                style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w600),
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 textAlign: TextAlign.center),
           ],
         ),
@@ -554,8 +541,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                     fontWeight: FontWeight.bold,
                     color: Colors.black)),
             TextButton(
-              onPressed: () =>
-                  context.push('/provider-job-requests'),
+              onPressed: () => context.push('/provider-job-requests'),
               child: const Text('See All',
                   style: TextStyle(
                       color: Colors.black, fontWeight: FontWeight.w600)),
@@ -613,8 +599,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
               CircleAvatar(
                 radius: 20,
                 backgroundColor: Colors.grey[200],
-                child: const Icon(Icons.person,
-                    size: 20, color: Colors.black54),
+                child:
+                    const Icon(Icons.person, size: 20, color: Colors.black54),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -625,14 +611,14 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                         style: const TextStyle(
                             fontSize: 15, fontWeight: FontWeight.bold)),
                     Text(service.toString(),
-                        style: TextStyle(
-                            fontSize: 13, color: Colors.grey[600])),
+                        style:
+                            TextStyle(fontSize: 13, color: Colors.grey[600])),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.green[50],
                   borderRadius: BorderRadius.circular(8),
@@ -651,15 +637,13 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
               Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
               const SizedBox(width: 4),
               Text(scheduledTime,
-                  style:
-                      TextStyle(fontSize: 12, color: Colors.grey[600])),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600])),
               const SizedBox(width: 12),
               Icon(Icons.location_on, size: 14, color: Colors.grey[600]),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(address.toString(),
-                    style:
-                        TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     overflow: TextOverflow.ellipsis),
               ),
             ],
@@ -703,8 +687,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     );
   }
 
-  Widget _buildTodayScheduleSection(
-      List<QueryDocumentSnapshot> todayDocs) {
+  Widget _buildTodayScheduleSection(List<QueryDocumentSnapshot> todayDocs) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -739,15 +722,13 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                       size: 48, color: Colors.grey[400]),
                   const SizedBox(height: 12),
                   Text('No jobs scheduled for today',
-                      style: TextStyle(
-                          fontSize: 14, color: Colors.grey[600])),
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600])),
                 ],
               ),
             ),
           )
         else
-          ...todayDocs
-              .map((doc) => _buildScheduleCard(doc)),
+          ...todayDocs.map((doc) => _buildScheduleCard(doc)),
       ],
     );
   }
@@ -761,8 +742,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     final bookingId = doc.id;
 
     return GestureDetector(
-      onTap: () =>
-          context.push('/provider-job-detail', extra: bookingId),
+      onTap: () => context.push('/provider-job-detail', extra: bookingId),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
@@ -771,9 +751,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: const [
             BoxShadow(
-                color: Color(0x1A000000),
-                blurRadius: 10,
-                offset: Offset(0, 4))
+                color: Color(0x1A000000), blurRadius: 10, offset: Offset(0, 4))
           ],
         ),
         child: Row(
@@ -784,8 +762,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.schedule,
-                  size: 24, color: Colors.black),
+              child: const Icon(Icons.schedule, size: 24, color: Colors.black),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -800,16 +777,14 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                   const SizedBox(height: 4),
                   Text(
                     '$clientName • ${address.toString()}',
-                    style: const TextStyle(
-                        fontSize: 13, color: Colors.white70),
+                    style: const TextStyle(fontSize: 13, color: Colors.white70),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
@@ -832,9 +807,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
         color: Colors.black,
         boxShadow: [
           BoxShadow(
-              color: Color(0x1A000000),
-              blurRadius: 10,
-              offset: Offset(0, -4))
+              color: Color(0x1A000000), blurRadius: 10, offset: Offset(0, -4))
         ],
       ),
       child: BottomNavigationBar(
@@ -844,8 +817,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
         backgroundColor: Colors.black,
         selectedItemColor: Colors.white,
         unselectedItemColor: const Color(0x99FFFFFF),
-        selectedLabelStyle:
-            const TextStyle(fontWeight: FontWeight.w600),
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
         elevation: 0,
         items: const [
           BottomNavigationBarItem(

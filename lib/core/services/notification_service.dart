@@ -38,11 +38,12 @@ class NotificationService {
         ?.createNotificationChannel(_androidChannel);
 
     // Initialise local notifications
-    const androidInit =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings();
     await _local.initialize(
-      const InitializationSettings(android: androidInit, iOS: iosInit),
+      settings:
+          const InitializationSettings(android: androidInit, iOS: iosInit),
+      onDidReceiveNotificationResponse: (details) {},
     );
 
     // Save token once on startup
@@ -84,10 +85,10 @@ class NotificationService {
     if (notification == null) return;
 
     await _local.show(
-      notification.hashCode,
-      notification.title,
-      notification.body,
-      NotificationDetails(
+      id: notification.hashCode,
+      title: notification.title,
+      body: notification.body,
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _androidChannel.id,
           _androidChannel.name,

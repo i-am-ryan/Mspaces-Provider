@@ -20,9 +20,14 @@ class _ActiveJobsScreenState extends State<ActiveJobsScreen>
   String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   Stream<QuerySnapshot> get _bookingsStream => FirebaseFirestore.instance
-      .collection('bookings')
-      .where('providerId', isEqualTo: _uid)
-      .where('status', whereIn: ['accepted', 'in_progress']).snapshots();
+          .collection('bookings')
+          .where('providerId', isEqualTo: _uid)
+          .where('status', whereIn: [
+        'accepted',
+        'in_progress',
+        'confirmed',
+        'pending_provider_confirmation'
+      ]).snapshots();
 
   Stream<QuerySnapshot> get _acceptedQuotesStream => FirebaseFirestore.instance
       .collection('quote_requests')

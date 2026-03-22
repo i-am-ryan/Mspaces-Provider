@@ -7,25 +7,6 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:397431518720:android:e83ed22b64bc192e818ae5",
-        "android_client_info": {
-          "package_name": "com.example.mspaces_provider"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyCUY_AWKCM8Nl5Dxuyknx4xMyNUCRYW3U4"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
         "mobilesdk_app_id": "1:397431518720:android:61e5bbd37bde26e7818ae5",
         "android_client_info": {
           "package_name": "com.mspaces.app"
@@ -33,6 +14,9 @@
       },
       "oauth_client": [],
       "api_key": [
+        {
+          "current_key": "AIzaSyC3MvH3VwspWAhuUa23dAsf2BHVRVvx47Q"
+        },
         {
           "current_key": "AIzaSyCUY_AWKCM8Nl5Dxuyknx4xMyNUCRYW3U4"
         }
@@ -52,6 +36,31 @@
       },
       "oauth_client": [],
       "api_key": [
+        {
+          "current_key": "AIzaSyC3MvH3VwspWAhuUa23dAsf2BHVRVvx47Q"
+        },
+        {
+          "current_key": "AIzaSyCUY_AWKCM8Nl5Dxuyknx4xMyNUCRYW3U4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:397431518720:android:4205302f6aaca429818ae5",
+        "android_client_info": {
+          "package_name": "com.mspaces.provider"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC3MvH3VwspWAhuUa23dAsf2BHVRVvx47Q"
+        },
         {
           "current_key": "AIzaSyCUY_AWKCM8Nl5Dxuyknx4xMyNUCRYW3U4"
         }

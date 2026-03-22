@@ -1,4 +1,4 @@
-package com.example.mspaces_provider
+package com.mspaces.provider
 
 import io.flutter.embedding.android.FlutterActivity
 

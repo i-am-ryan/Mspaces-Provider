@@ -39,13 +39,28 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
   bool _acceptTerms = false;
 
   final List<String> _serviceCategories = [
-    'Plumbing', 'Electrical', 'Painting', 'Cleaning', 'Gardening',
-    'HVAC', 'Carpentry', 'Locksmith', 'Pest Control', 'Roofing',
+    'Plumbing',
+    'Electrical',
+    'Painting',
+    'Cleaning',
+    'Gardening',
+    'HVAC',
+    'Carpentry',
+    'Locksmith',
+    'Pest Control',
+    'Roofing',
   ];
 
   final List<String> _provinces = [
-    'Gauteng', 'Western Cape', 'KwaZulu-Natal', 'Eastern Cape',
-    'Free State', 'Limpopo', 'Mpumalanga', 'North West', 'Northern Cape',
+    'Gauteng',
+    'Western Cape',
+    'KwaZulu-Natal',
+    'Eastern Cape',
+    'Free State',
+    'Limpopo',
+    'Mpumalanga',
+    'North West',
+    'Northern Cape',
   ];
 
   @override
@@ -139,7 +154,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
             // Different password — genuinely already registered
             if (mounted) {
               _showError(
-                'An account already exists with this email. Please login instead.');
+                  'An account already exists with this email. Please login instead.');
             }
             return;
           }
@@ -211,12 +226,11 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
           builder: (ctx) => AlertDialog(
             title: const Text('Verify Your Email'),
             content: const Text(
-              'A verification email has been sent to your email address. '
-              'Please verify your email before logging in.'),
+                'A verification email has been sent to your email address. '
+                'Please verify your email before logging in.'),
             actions: [
               ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
                 onPressed: () => context.go('/provider-login'),
                 child: const Text('Go to Login',
                     style: TextStyle(color: Colors.white)),
@@ -225,10 +239,10 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
           ),
         );
       }
-
     } on FirebaseAuthException catch (e) {
       if (mounted) _showError(_authMessage(e.code));
     } catch (e) {
+      debugPrint('REGISTRATION ERROR: ${e.toString()}');
       if (mounted) _showError('Error: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -370,7 +384,8 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
             decoration: BoxDecoration(
               color: isActive ? Colors.black : Colors.grey[200],
               shape: BoxShape.circle,
-              border: isCurrent ? Border.all(color: Colors.black, width: 2) : null,
+              border:
+                  isCurrent ? Border.all(color: Colors.black, width: 2) : null,
             ),
             child: Center(
               child: isActive && !isCurrent
@@ -431,34 +446,57 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
         Text('Tell us about you and your business',
             style: TextStyle(fontSize: 14, color: Colors.grey[600])),
         const SizedBox(height: 24),
-        _buildTextField(controller: _businessNameController, label: 'Business Name',
-            hint: "e.g., John's Plumbing Services", icon: Icons.business),
+        _buildTextField(
+            controller: _businessNameController,
+            label: 'Business Name',
+            hint: "e.g., John's Plumbing Services",
+            icon: Icons.business),
         const SizedBox(height: 16),
-        _buildTextField(controller: _fullNameController, label: 'Full Name',
-            hint: 'Your full name', icon: Icons.person),
+        _buildTextField(
+            controller: _fullNameController,
+            label: 'Full Name',
+            hint: 'Your full name',
+            icon: Icons.person),
         const SizedBox(height: 16),
-        _buildTextField(controller: _emailController, label: 'Email Address',
-            hint: 'your@email.com', icon: Icons.email,
+        _buildTextField(
+            controller: _emailController,
+            label: 'Email Address',
+            hint: 'your@email.com',
+            icon: Icons.email,
             keyboardType: TextInputType.emailAddress),
         const SizedBox(height: 16),
-        _buildTextField(controller: _phoneController, label: 'Phone Number',
-            hint: '+27 82 123 4567', icon: Icons.phone,
+        _buildTextField(
+            controller: _phoneController,
+            label: 'Phone Number',
+            hint: '+27 82 123 4567',
+            icon: Icons.phone,
             keyboardType: TextInputType.phone),
         const SizedBox(height: 16),
-        _buildTextField(controller: _passwordController, label: 'Password',
-            hint: 'Create a password', icon: Icons.lock,
+        _buildTextField(
+            controller: _passwordController,
+            label: 'Password',
+            hint: 'Create a password',
+            icon: Icons.lock,
             obscureText: _obscurePassword,
             suffixIcon: IconButton(
-              icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              icon: Icon(
+                  _obscurePassword ? Icons.visibility_off : Icons.visibility),
+              onPressed: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
             )),
         const SizedBox(height: 16),
-        _buildTextField(controller: _confirmPasswordController,
-            label: 'Confirm Password', hint: 'Confirm your password',
-            icon: Icons.lock_outline, obscureText: _obscureConfirmPassword,
+        _buildTextField(
+            controller: _confirmPasswordController,
+            label: 'Confirm Password',
+            hint: 'Confirm your password',
+            icon: Icons.lock_outline,
+            obscureText: _obscureConfirmPassword,
             suffixIcon: IconButton(
-              icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+              icon: Icon(_obscureConfirmPassword
+                  ? Icons.visibility_off
+                  : Icons.visibility),
+              onPressed: () => setState(
+                  () => _obscureConfirmPassword = !_obscureConfirmPassword),
             )),
       ],
     );
@@ -489,22 +527,29 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
               value: _selectedCategory,
               isExpanded: true,
               icon: const Icon(Icons.keyboard_arrow_down),
-              items: _serviceCategories.map((c) => DropdownMenuItem(
-                value: c,
-                child: Row(children: [
-                  Icon(_getCategoryIcon(c), size: 20),
-                  const SizedBox(width: 12),
-                  Text(c),
-                ]),
-              )).toList(),
-              onChanged: (v) { if (v != null) setState(() => _selectedCategory = v); },
+              items: _serviceCategories
+                  .map((c) => DropdownMenuItem(
+                        value: c,
+                        child: Row(children: [
+                          Icon(_getCategoryIcon(c), size: 20),
+                          const SizedBox(width: 12),
+                          Text(c),
+                        ]),
+                      ))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _selectedCategory = v);
+              },
             ),
           ),
         ),
         const SizedBox(height: 20),
-        _buildTextField(controller: _yearsExperienceController,
-            label: 'Years of Experience', hint: 'e.g., 5',
-            icon: Icons.work_history, keyboardType: TextInputType.number),
+        _buildTextField(
+            controller: _yearsExperienceController,
+            label: 'Years of Experience',
+            hint: 'e.g., 5',
+            icon: Icons.work_history,
+            keyboardType: TextInputType.number),
         const SizedBox(height: 20),
         const Text('Service Description',
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
@@ -513,7 +558,8 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
           controller: _descriptionController,
           maxLines: 4,
           decoration: InputDecoration(
-            hintText: 'Describe your services, expertise, and what makes you stand out...',
+            hintText:
+                'Describe your services, expertise, and what makes you stand out...',
             filled: true,
             fillColor: Colors.grey[50],
             border: OutlineInputBorder(
@@ -544,12 +590,17 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
         Text('Where are you based?',
             style: TextStyle(fontSize: 14, color: Colors.grey[600])),
         const SizedBox(height: 24),
-        _buildTextField(controller: _streetAddressController,
-            label: 'Street Address', hint: '123 Main Street',
+        _buildTextField(
+            controller: _streetAddressController,
+            label: 'Street Address',
+            hint: '123 Main Street',
             icon: Icons.location_on),
         const SizedBox(height: 16),
-        _buildTextField(controller: _cityController, label: 'City',
-            hint: 'e.g., Johannesburg', icon: Icons.location_city),
+        _buildTextField(
+            controller: _cityController,
+            label: 'City',
+            hint: 'e.g., Johannesburg',
+            icon: Icons.location_city),
         const SizedBox(height: 16),
         const Text('Province',
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
@@ -566,16 +617,24 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
               value: _selectedProvince,
               isExpanded: true,
               icon: const Icon(Icons.keyboard_arrow_down),
-              items: _provinces.map((p) => DropdownMenuItem(
-                value: p, child: Text(p),
-              )).toList(),
-              onChanged: (v) { if (v != null) setState(() => _selectedProvince = v); },
+              items: _provinces
+                  .map((p) => DropdownMenuItem(
+                        value: p,
+                        child: Text(p),
+                      ))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _selectedProvince = v);
+              },
             ),
           ),
         ),
         const SizedBox(height: 16),
-        _buildTextField(controller: _postalCodeController, label: 'Postal Code',
-            hint: 'e.g., 2196', icon: Icons.markunread_mailbox,
+        _buildTextField(
+            controller: _postalCodeController,
+            label: 'Postal Code',
+            hint: 'e.g., 2196',
+            icon: Icons.markunread_mailbox,
             keyboardType: TextInputType.number),
         const SizedBox(height: 24),
         const Text('Service Radius',
@@ -589,7 +648,9 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
             Expanded(
               child: Slider(
                 value: _serviceRadius,
-                min: 5, max: 50, divisions: 9,
+                min: 5,
+                max: 50,
+                divisions: 9,
                 activeColor: Colors.black,
                 inactiveColor: Colors.grey[300],
                 onChanged: (v) => setState(() => _serviceRadius = v),
@@ -603,7 +664,8 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
               ),
               child: Text(
                 '${_serviceRadius.toInt()} km',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -626,12 +688,14 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
                       TextSpan(text: 'I agree to the '),
                       TextSpan(
                         text: 'Terms of Service',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, color: Colors.black),
                       ),
                       TextSpan(text: ' and '),
                       TextSpan(
                         text: 'Privacy Policy',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, color: Colors.black),
                       ),
                     ],
                   ),
@@ -714,7 +778,8 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
                       borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text('Previous',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               ),
             ),
             const SizedBox(width: 12),
@@ -731,11 +796,11 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
               ),
               child: _isLoading
                   ? const SizedBox(
-                      height: 20, width: 20,
+                      height: 20,
+                      width: 20,
                       child: CircularProgressIndicator(
                           color: Colors.white, strokeWidth: 2))
-                  : Text(
-                      _currentStep == 2 ? 'Complete Registration' : 'Next',
+                  : Text(_currentStep == 2 ? 'Complete Registration' : 'Next',
                       style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w600)),
             ),
@@ -747,17 +812,28 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
 
   IconData _getCategoryIcon(String category) {
     switch (category) {
-      case 'Plumbing': return Icons.plumbing;
-      case 'Electrical': return Icons.electrical_services;
-      case 'Painting': return Icons.format_paint;
-      case 'Cleaning': return Icons.cleaning_services;
-      case 'Gardening': return Icons.grass;
-      case 'HVAC': return Icons.ac_unit;
-      case 'Carpentry': return Icons.carpenter;
-      case 'Locksmith': return Icons.lock;
-      case 'Pest Control': return Icons.pest_control;
-      case 'Roofing': return Icons.roofing;
-      default: return Icons.build;
+      case 'Plumbing':
+        return Icons.plumbing;
+      case 'Electrical':
+        return Icons.electrical_services;
+      case 'Painting':
+        return Icons.format_paint;
+      case 'Cleaning':
+        return Icons.cleaning_services;
+      case 'Gardening':
+        return Icons.grass;
+      case 'HVAC':
+        return Icons.ac_unit;
+      case 'Carpentry':
+        return Icons.carpenter;
+      case 'Locksmith':
+        return Icons.lock;
+      case 'Pest Control':
+        return Icons.pest_control;
+      case 'Roofing':
+        return Icons.roofing;
+      default:
+        return Icons.build;
     }
   }
 }
