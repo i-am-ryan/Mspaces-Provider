@@ -322,6 +322,29 @@ class ProviderInvoiceDetailScreen extends StatelessWidget {
                     ),
                   ],
 
+                  // Deposit paid
+                  Builder(builder: (context) {
+                    final depositPaid =
+                        (inv['depositPaid'] as num?)?.toDouble() ?? 0;
+                    if (depositPaid <= 0) return const SizedBox.shrink();
+                    return Column(children: [
+                      Divider(height: 1, color: Colors.grey.shade200),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 11),
+                        child: Row(children: [
+                          Expanded(
+                              child: Text('Deposit paid',
+                                  style: TextStyle(
+                                      fontSize: 13, color: Colors.grey[600]))),
+                          Text('− R ${depositPaid.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                  fontSize: 13, color: Colors.grey[600])),
+                        ]),
+                      ),
+                    ]);
+                  }),
+
                   // Outstanding
                   if (!isPaid)
                     Container(

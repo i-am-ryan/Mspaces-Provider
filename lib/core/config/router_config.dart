@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../presentation/screens/provider/jobs/create_quote_screen.dart';
 import '../../presentation/screens/provider/earnings/provider_invoice_detail_screen.dart';
 import '../../presentation/screens/provider/jobs/provider_quote_detail_screen.dart';
 import '../../presentation/screens/provider/splash/splash_screen.dart';
@@ -111,6 +112,14 @@ class AppRouter {
         builder: (context, state) => ProviderQuoteDetailScreen(
           quoteRequestId: state.pathParameters['id']!,
         ),
+      ),
+      GoRoute(
+        path: '/provider-create-quote',
+        name: 'provider-create-quote',
+        builder: (context, state) {
+          final data = state.extra as Map<String, dynamic>? ?? {};
+          return CreateQuoteScreen(data: data);
+        },
       ),
       GoRoute(
         path: '/provider-job-history',

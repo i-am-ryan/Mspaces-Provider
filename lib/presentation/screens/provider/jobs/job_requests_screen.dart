@@ -29,6 +29,7 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
         'confirmed',
         'accepted',
         'in_progress',
+        'assessment_complete',
       ]).snapshots();
 
   Stream<QuerySnapshot> get _allQuotesStream => FirebaseFirestore.instance
@@ -161,6 +162,9 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
     final notesCtrl = TextEditingController();
     final validDaysCtrl = TextEditingController(text: '7');
     bool isSending = false;
+    bool includeVat = false;
+    bool requireDeposit = false;
+    double depositPercent = 50;
 
     showModalBottomSheet(
       context: context,
@@ -297,6 +301,87 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
                   ]),
                 ),
                 const SizedBox(height: 16),
+                // VAT + Deposit options
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Column(children: [
+                    Row(children: [
+                      Checkbox(
+                        value: includeVat,
+                        onChanged: (v) =>
+                            setSheet(() => includeVat = v ?? false),
+                        activeColor: Colors.black,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Include VAT (15%)',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600)),
+                              Text(
+                                includeVat
+                                    ? 'VAT will be added to the total'
+                                    : 'Add 15% VAT to subtotal',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey[600]),
+                              ),
+                            ]),
+                      ),
+                    ]),
+                    Divider(height: 1, color: Colors.grey.shade200),
+                    Row(children: [
+                      Checkbox(
+                        value: requireDeposit,
+                        onChanged: (v) =>
+                            setSheet(() => requireDeposit = v ?? false),
+                        activeColor: Colors.black,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Require Deposit',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600)),
+                              Text(
+                                requireDeposit
+                                    ? '${depositPercent.toInt()}% payable upfront'
+                                    : 'Request upfront deposit',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey[600]),
+                              ),
+                            ]),
+                      ),
+                      if (requireDeposit)
+                        DropdownButton<double>(
+                          value: depositPercent,
+                          isDense: true,
+                          underline: const SizedBox(),
+                          items: [25.0, 30.0, 50.0, 60.0, 70.0]
+                              .map((p) => DropdownMenuItem(
+                                  value: p,
+                                  child: Text('${p.toInt()}%',
+                                      style: const TextStyle(fontSize: 13))))
+                              .toList(),
+                          onChanged: (v) =>
+                              setSheet(() => depositPercent = v ?? 50),
+                        ),
+                    ]),
+                  ]),
+                ),
+                const SizedBox(height: 16),
                 const Text('Notes (Optional)',
                     style:
                         TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
@@ -384,17 +469,29 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
                                             0,
                                       })
                                   .toList();
-                              final total = lineItemData.fold<double>(
+                              final subtotal = lineItemData.fold<double>(
                                   0,
                                   (sum, item) =>
                                       sum + (item['amount'] as double));
+                              final vatAmount =
+                                  includeVat ? subtotal * 0.15 : 0;
+                              final total = subtotal + vatAmount;
+                              final depositAmount = requireDeposit
+                                  ? total * depositPercent / 100
+                                  : 0;
                               final callable = FirebaseFunctions.instanceFor(
                                       region: 'europe-west4')
                                   .httpsCallable('submitProviderQuote');
                               await callable.call({
                                 'quoteRequestId': quoteRequestId,
                                 'lineItems': lineItemData,
+                                'subtotal': subtotal,
+                                'vatAmount': vatAmount,
+                                'includeVat': includeVat,
                                 'total': total,
+                                'requireDeposit': requireDeposit,
+                                'depositPercent': depositPercent,
+                                'depositAmount': depositAmount,
                                 'notes': notesCtrl.text.trim(),
                                 'validDays':
                                     int.tryParse(validDaysCtrl.text) ?? 7,
@@ -453,7 +550,22 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.push('/provider-create-quote', extra: {
+          'bookingId': '',
+          'clientId': '',
+          'clientName': '',
+          'category': '',
+          'address': '',
+          'description': '',
+          'providerId': _uid,
+          'providerName': '',
+        }),
+        backgroundColor: Colors.black,
+        icon: const Icon(Icons.request_quote_outlined, color: Colors.white),
+        label:
+            const Text('Create Quote', style: TextStyle(color: Colors.white)),
+      ),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -622,15 +734,17 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
         statusColor = Colors.purple;
         statusLabel = 'In Progress';
         break;
+      case 'assessment_complete':
+        statusColor = Colors.teal;
+        statusLabel = 'Assessment Done';
+        break;
       default:
         statusColor = Colors.grey;
         statusLabel = status;
     }
 
     return GestureDetector(
-      onTap: needsAction
-          ? null
-          : () => context.push('/provider-job-detail', extra: bookingId),
+      onTap: () => context.push('/provider-job-detail', extra: bookingId),
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
@@ -799,6 +913,39 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
                     ),
                   ),
                 ]),
+              ],
+              if (status == 'assessment_complete') ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () =>
+                        context.push('/provider-create-quote', extra: {
+                      'bookingId': doc.id,
+                      'clientId':
+                          (d['clientId'] ?? d['userId'])?.toString() ?? '',
+                      'clientName': d['clientName']?.toString() ?? 'Client',
+                      'category': d['serviceCategory']?.toString() ??
+                          d['category']?.toString() ??
+                          'Service',
+                      'address': d['address']?.toString() ?? '',
+                      'description': d['description']?.toString() ?? '',
+                      'providerId': d['providerId']?.toString() ?? '',
+                      'providerName': d['providerName']?.toString() ?? '',
+                    }),
+                    icon: const Icon(Icons.request_quote_outlined,
+                        size: 16, color: Colors.white),
+                    label: const Text('Create Quote',
+                        style: TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.w600)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
               ] else ...[
                 const SizedBox(height: 8),
                 Align(

@@ -28,10 +28,21 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
       .where('status',
           whereIn: ['pending', 'pending_provider_confirmation']).snapshots();
 
-  Stream<QuerySnapshot> get _activeStream => FirebaseFirestore.instance
-      .collection('bookings')
+  Stream<QuerySnapshot> get _pendingQuotesStream => FirebaseFirestore.instance
+      .collection('quote_requests')
       .where('providerId', isEqualTo: _uid)
-      .where('status', whereIn: ['accepted', 'in_progress']).snapshots();
+      .where('status', isEqualTo: 'pending')
+      .snapshots();
+
+  Stream<QuerySnapshot> get _activeStream => FirebaseFirestore.instance
+          .collection('bookings')
+          .where('providerId', isEqualTo: _uid)
+          .where('status', whereIn: [
+        'accepted',
+        'confirmed',
+        'in_progress',
+        'assessment_complete'
+      ]).snapshots();
 
   Stream<QuerySnapshot> get _earningsStream => FirebaseFirestore.instance
       .collection('transactions')
@@ -40,10 +51,11 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
       .where('status', isEqualTo: 'completed')
       .snapshots();
 
-  List<QueryDocumentSnapshot> _todayJobs(List<QueryDocumentSnapshot> docs) {
-    final today = DateTime.now();
-    final start = DateTime(today.year, today.month, today.day);
-    final end = start.add(const Duration(days: 1));
+  List<QueryDocumentSnapshot> _weekJobs(List<QueryDocumentSnapshot> docs) {
+    final now = DateTime.now();
+    final monday = now.subtract(Duration(days: now.weekday - 1));
+    final start = DateTime(monday.year, monday.month, monday.day);
+    final end = start.add(const Duration(days: 7));
     return docs.where((doc) {
       final ts = (doc.data() as Map)['scheduledDate'];
       if (ts is! Timestamp) return false;
@@ -106,7 +118,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
           .collection('bookings')
           .doc(bookingId)
           .update({
-        'status': 'accepted',
+        'status': 'confirmed',
+        'paymentStatus': 'callout_pending',
         'acceptedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -141,64 +154,88 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
         return StreamBuilder<QuerySnapshot>(
           stream: _pendingStream,
           builder: (context, pendingSnap) {
-            final pendingDocs =
-                List<QueryDocumentSnapshot>.from(pendingSnap.data?.docs ?? []);
-
             return StreamBuilder<QuerySnapshot>(
-              stream: _activeStream,
-              builder: (context, activeSnap) {
-                final activeDocs = List<QueryDocumentSnapshot>.from(
-                    activeSnap.data?.docs ?? []);
-                final todayDocs = _todayJobs(activeDocs);
+              stream: _pendingQuotesStream,
+              builder: (context, quotesSnap) {
+                final pendingDocs = List<QueryDocumentSnapshot>.from(
+                    pendingSnap.data?.docs ?? []);
+                final pendingQuoteDocs = List<QueryDocumentSnapshot>.from(
+                    quotesSnap.data?.docs ?? []);
+                final allPendingCount =
+                    pendingDocs.length + pendingQuoteDocs.length;
 
                 return StreamBuilder<QuerySnapshot>(
-                  stream: _earningsStream,
-                  builder: (context, earningsSnap) {
-                    final earningsDocs = List<QueryDocumentSnapshot>.from(
-                        earningsSnap.data?.docs ?? []);
-                    final weekTotal = _weekEarnings(earningsDocs);
+                  stream: _activeStream,
+                  builder: (context, activeSnap) {
+                    final activeDocs = List<QueryDocumentSnapshot>.from(
+                        activeSnap.data?.docs ?? []);
+                    final weekDocs = _weekJobs(activeDocs).where((doc) {
+                      final status =
+                          (doc.data() as Map)['status']?.toString() ?? '';
+                      return status == 'confirmed' || status == 'accepted';
+                    }).toList()
+                      ..sort((a, b) {
+                        final aTs = ((a.data() as Map)['scheduledDate']);
+                        final bTs = ((b.data() as Map)['scheduledDate']);
+                        if (aTs is Timestamp && bTs is Timestamp)
+                          return aTs.compareTo(bTs);
+                        return 0;
+                      });
 
-                    return Scaffold(
-                      backgroundColor: Colors.white,
-                      body: SafeArea(
-                        child: Column(
-                          children: [
-                            _buildTopBar(displayName, isAvailable),
-                            Expanded(
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _buildHeroBanner(displayName, isAvailable),
-                                    Padding(
-                                      padding: const EdgeInsets.all(20),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          _buildStatsCards(
-                                            todayCount: todayDocs.length,
-                                            weekEarnings: weekTotal,
-                                            pendingCount: pendingDocs.length,
+                    return StreamBuilder<QuerySnapshot>(
+                      stream: _earningsStream,
+                      builder: (context, earningsSnap) {
+                        final earningsDocs = List<QueryDocumentSnapshot>.from(
+                            earningsSnap.data?.docs ?? []);
+                        final weekTotal = _weekEarnings(earningsDocs);
+
+                        return Scaffold(
+                          backgroundColor: Colors.white,
+                          body: SafeArea(
+                            child: Column(
+                              children: [
+                                _buildTopBar(displayName, isAvailable),
+                                Expanded(
+                                  child: SingleChildScrollView(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        _buildHeroBanner(
+                                            displayName, isAvailable),
+                                        Padding(
+                                          padding: const EdgeInsets.all(20),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              _buildStatsCards(
+                                                todayCount: weekDocs.length,
+                                                weekEarnings: weekTotal,
+                                                pendingCount: allPendingCount,
+                                              ),
+                                              const SizedBox(height: 24),
+                                              _buildQuickActions(),
+                                              const SizedBox(height: 24),
+                                              _buildPendingSection(pendingDocs,
+                                                  pendingQuoteDocs),
+                                              const SizedBox(height: 24),
+                                              _buildTodayScheduleSection(
+                                                  weekDocs),
+                                            ],
                                           ),
-                                          const SizedBox(height: 24),
-                                          _buildQuickActions(),
-                                          const SizedBox(height: 24),
-                                          _buildPendingSection(pendingDocs),
-                                          const SizedBox(height: 24),
-                                          _buildTodayScheduleSection(todayDocs),
-                                        ],
-                                      ),
+                                        ),
+                                        const SizedBox(height: 80),
+                                      ],
                                     ),
-                                    const SizedBox(height: 80),
-                                  ],
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                      bottomNavigationBar: _buildBottomNav(),
+                          ),
+                          bottomNavigationBar: _buildBottomNav(),
+                        );
+                      },
                     );
                   },
                 );
@@ -528,15 +565,20 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     );
   }
 
-  Widget _buildPendingSection(List<QueryDocumentSnapshot> pendingDocs) {
+  Widget _buildPendingSection(List<QueryDocumentSnapshot> pendingDocs,
+      List<QueryDocumentSnapshot> pendingQuoteDocs) {
+    if (pendingDocs.isEmpty && pendingQuoteDocs.isEmpty) {
+      return const SizedBox.shrink();
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Pending Requests',
-                style: TextStyle(
+            Text(
+                'Pending Requests (${pendingDocs.length + pendingQuoteDocs.length})',
+                style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.black)),
@@ -549,20 +591,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        if (pendingDocs.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Text('No pending requests',
-                  style: TextStyle(color: Colors.grey[500])),
-            ),
-          )
-        else
-          ...pendingDocs.take(2).map((doc) => _buildRequestCard(doc)),
+        ...pendingDocs.take(2).map((doc) => _buildRequestCard(doc)),
+        ...pendingQuoteDocs.take(2).map((doc) => _buildQuoteRequestCard(doc)),
       ],
     );
   }
@@ -687,15 +717,87 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     );
   }
 
+  Widget _buildQuoteRequestCard(QueryDocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>;
+    final clientName = d['clientName']?.toString() ?? 'Client';
+    final category = d['category']?.toString() ?? 'Service';
+    final address = d['address']?.toString() ?? '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.purple.shade200, width: 1.5),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x0D000000), blurRadius: 8, offset: Offset(0, 2))
+        ],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.purple.shade50,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text('Quote Request',
+                style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.purple.shade700,
+                    fontWeight: FontWeight.w600)),
+          ),
+          const Spacer(),
+          Icon(Icons.chevron_right, color: Colors.grey[400], size: 18),
+        ]),
+        const SizedBox(height: 8),
+        Text(category,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(clientName,
+            style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+        if (address.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(address,
+              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
+        ],
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => context.push('/provider-quote-detail/${doc.id}'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purple.shade700,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('View & Quote',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          ),
+        ),
+      ]),
+    );
+  }
+
   Widget _buildTodayScheduleSection(List<QueryDocumentSnapshot> todayDocs) {
+    final visible = todayDocs.take(5).toList();
+    final hasMore = todayDocs.length > 5;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text("Today's Schedule",
-                style: TextStyle(
+            Text(
+                "This Week's Schedule${todayDocs.isNotEmpty ? ' (${todayDocs.length})' : ''}",
+                style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.black)),
@@ -721,14 +823,42 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                   Icon(Icons.event_available,
                       size: 48, color: Colors.grey[400]),
                   const SizedBox(height: 12),
-                  Text('No jobs scheduled for today',
+                  Text('No confirmed jobs this week',
                       style: TextStyle(fontSize: 14, color: Colors.grey[600])),
                 ],
               ),
             ),
           )
-        else
-          ...todayDocs.map((doc) => _buildScheduleCard(doc)),
+        else ...[
+          ...visible.map((doc) => _buildScheduleCard(doc)),
+          if (hasMore)
+            GestureDetector(
+              onTap: () => context.push('/provider-calendar'),
+              child: Container(
+                margin: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'See all ${todayDocs.length} jobs this week',
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.chevron_right, size: 18),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
       ],
     );
   }

@@ -711,7 +711,54 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       ]),
       child: SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          if (status == 'confirmed' || status == 'accepted')
+          // Show on-site quote button if callout fee paid
+          //Assesment complete button
+          if ((status == 'confirmed' || status == 'accepted') &&
+              data['paymentStatus'] == 'callout_paid') ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  try {
+                    await FirebaseFirestore.instance
+                        .collection('bookings')
+                        .doc(widget.bookingId)
+                        .update({
+                      'status': 'assessment_complete',
+                      'assessmentCompletedAt': FieldValue.serverTimestamp(),
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    });
+                  } catch (_) {}
+                  if (!mounted) return;
+                  context.push('/provider-create-quote', extra: {
+                    'bookingId': widget.bookingId,
+                    'clientId':
+                        (data['clientId'] ?? data['userId'])?.toString() ?? '',
+                    'clientName': data['clientName']?.toString() ?? 'Client',
+                    'category': data['serviceCategory']?.toString() ??
+                        data['category']?.toString() ??
+                        'Service',
+                    'address': data['address']?.toString() ?? '',
+                    'description': data['description']?.toString() ?? '',
+                    'providerId': data['providerId']?.toString() ?? _uid,
+                    'providerName': data['providerName']?.toString() ?? '',
+                  });
+                },
+                label: const Text('On-Site Assessment Complete',
+                    style: TextStyle(
+                        color: Colors.black, fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.black),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12))),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+
+          // Start Job button
+          if (status == 'confirmed' || status == 'accepted') ...[
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -727,6 +774,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                         borderRadius: BorderRadius.circular(12))),
               ),
             ),
+          ],
+
+          //Complete Job Button
           if (status == 'in_progress') ...[
             if (!_showCompletionForm)
               SizedBox(
