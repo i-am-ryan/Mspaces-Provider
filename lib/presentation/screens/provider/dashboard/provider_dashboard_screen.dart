@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -114,17 +115,35 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
 
   Future<void> _acceptJob(String bookingId) async {
     try {
-      await FirebaseFirestore.instance
+      final doc = await FirebaseFirestore.instance
           .collection('bookings')
           .doc(bookingId)
-          .update({
-        'status': 'confirmed',
-        'paymentStatus': 'callout_pending',
-        'acceptedAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+          .get();
+      final status = (doc.data() as Map?)?['status']?.toString() ?? '';
+
+      if (status == 'pending_provider_confirmation') {
+        await FirebaseFirestore.instance
+            .collection('bookings')
+            .doc(bookingId)
+            .update({
+          'status': 'confirmed',
+          'returnVisitConfirmedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        final callable = FirebaseFunctions.instanceFor(region: 'europe-west4')
+            .httpsCallable('confirmBooking');
+        await callable.call({'bookingId': bookingId});
+      }
       if (mounted) context.push('/provider-job-detail', extra: bookingId);
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed to confirm: $e'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
   }
 
   Future<void> _declineJob(String bookingId) async {

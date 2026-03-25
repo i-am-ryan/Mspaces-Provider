@@ -57,9 +57,48 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
 
   Future<void> _acceptJob(String bookingId) async {
     try {
-      final callable = FirebaseFunctions.instanceFor(region: 'europe-west4')
-          .httpsCallable('confirmBooking');
-      await callable.call({'bookingId': bookingId});
+      // Check booking status first
+      final doc = await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .get();
+      final status = (doc.data() as Map?)?['status']?.toString() ?? '';
+
+      if (status == 'pending_provider_confirmation') {
+        // Return visit confirmation — just update status, no invoice
+        await FirebaseFirestore.instance
+            .collection('bookings')
+            .doc(bookingId)
+            .update({
+          'status': 'confirmed',
+          'returnVisitConfirmedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        // Notify client
+        final data = doc.data() as Map<String, dynamic>;
+        final clientId =
+            data['clientId']?.toString() ?? data['userId']?.toString() ?? '';
+        if (clientId.isNotEmpty) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(clientId)
+              .collection('notifications')
+              .add({
+            'title': 'Return Visit Confirmed',
+            'body': 'Your provider has confirmed the return visit date.',
+            'type': 'return_visit_confirmed',
+            'bookingId': bookingId,
+            'read': false,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+      } else {
+        // Initial booking confirmation — call CF which generates INV-COF
+        final callable = FirebaseFunctions.instanceFor(region: 'europe-west4')
+            .httpsCallable('confirmBooking');
+        await callable.call({'bookingId': bookingId});
+      }
+
       if (mounted) context.push('/provider-job-detail', extra: bookingId);
     } catch (e) {
       if (mounted) {
