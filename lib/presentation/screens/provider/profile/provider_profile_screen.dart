@@ -1,3 +1,4 @@
+import 'package:mspaces_provider/presentation/widgets/common/report_content_widget.dart';
 import 'dart:async';
 
 import 'dart:io';
@@ -1178,6 +1179,41 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                               style: TextStyle(
                                   fontSize: 11, color: Colors.grey[400])),
                         ],
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: GestureDetector(
+                            onTap: () => ReportContentWidget(
+                              contentType: 'review',
+                              contentId: review['id']?.toString() ?? '',
+                              contentPreview: comment,
+                              reportedUserId:
+                                  review['clientId']?.toString() ?? '',
+                              reportedUserName: clientName,
+                            ).show(context),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.red.shade200),
+                              ),
+                              child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.flag_outlined,
+                                        size: 13, color: Colors.red.shade700),
+                                    const SizedBox(width: 4),
+                                    Text('Report',
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.red.shade700,
+                                            fontWeight: FontWeight.w600)),
+                                  ]),
+                            ),
+                          ),
+                        ),
                       ]),
                 );
               },
@@ -1254,6 +1290,38 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                 Text(DateFormat('dd MMM yyyy').format(createdAt),
                     style: TextStyle(fontSize: 11, color: Colors.grey[400])),
               ],
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: GestureDetector(
+                  onTap: () => ReportContentWidget(
+                    contentType: 'review',
+                    contentId: review['id']?.toString() ?? '',
+                    contentPreview: comment,
+                    reportedUserId: review['clientId']?.toString() ?? '',
+                    reportedUserName: clientName,
+                  ).show(context),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.flag_outlined,
+                          size: 13, color: Colors.red.shade700),
+                      const SizedBox(width: 4),
+                      Text('Report',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.red.shade700,
+                              fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
+                ),
+              ),
             ]),
           );
         }),
