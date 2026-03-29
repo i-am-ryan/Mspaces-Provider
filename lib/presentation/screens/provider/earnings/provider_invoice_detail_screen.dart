@@ -12,11 +12,16 @@ class ProviderInvoiceDetailScreen extends StatelessWidget {
   const ProviderInvoiceDetailScreen({Key? key, required this.invoiceId})
       : super(key: key);
 
-  double _providerAmount(Map<String, dynamic> inv) =>
-      (inv['providerAmount'] as num?)?.toDouble() ??
-      (inv['subtotal'] as num?)?.toDouble() ??
-      (inv['total'] as num?)?.toDouble() ??
-      0;
+  double _providerAmount(Map<String, dynamic> inv) {
+    final type = inv['invoiceType']?.toString() ?? '';
+    if (type == 'payout') {
+      return (inv['payoutAmount'] as num?)?.toDouble() ?? 0;
+    }
+    return (inv['providerAmount'] as num?)?.toDouble() ??
+        (inv['subtotal'] as num?)?.toDouble() ??
+        (inv['total'] as num?)?.toDouble() ??
+        0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +55,9 @@ class ProviderInvoiceDetailScreen extends StatelessWidget {
           final inv = snap.data!.data() as Map<String, dynamic>;
           final invoiceNumber = inv['invoiceNumber']?.toString() ?? invoiceId;
           final clientName = inv['clientName']?.toString() ?? 'Client';
+          final invoiceType = inv['invoiceType']?.toString() ?? '';
+          final isPayout = invoiceType == 'payout';
+          final providerName = inv['providerName']?.toString() ?? '';
           final category = inv['serviceCategory']?.toString() ?? 'Service';
           final status = inv['status']?.toString() ?? 'outstanding';
           final isPaid = status == 'paid';
@@ -166,8 +174,8 @@ class ProviderInvoiceDetailScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Client info
-              _sectionTitle('Client'),
+              // Provider/Client info
+              _sectionTitle(isPayout ? 'Provider' : 'Client'),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(14),
@@ -187,7 +195,13 @@ class ProviderInvoiceDetailScreen extends StatelessWidget {
                     radius: 22,
                     backgroundColor: Colors.grey[200],
                     child: Text(
-                      clientName.isNotEmpty ? clientName[0].toUpperCase() : '?',
+                      isPayout
+                          ? (providerName.isNotEmpty
+                              ? providerName[0].toUpperCase()
+                              : '?')
+                          : (clientName.isNotEmpty
+                              ? clientName[0].toUpperCase()
+                              : '?'),
                       style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.bold),
                     ),
@@ -197,7 +211,7 @@ class ProviderInvoiceDetailScreen extends StatelessWidget {
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(clientName,
+                          Text(isPayout ? providerName : clientName,
                               style: const TextStyle(
                                   fontSize: 15, fontWeight: FontWeight.bold)),
                           Text(category,
@@ -222,8 +236,22 @@ class ProviderInvoiceDetailScreen extends StatelessWidget {
                   // Line items
                   ...lineItems.asMap().entries.map((e) {
                     final item = e.value as Map<String, dynamic>;
-                    final desc = item['description']?.toString() ?? '';
+                    String desc = item['description']?.toString() ?? '';
                     final amount = (item['amount'] as num?)?.toDouble() ?? 0;
+                    // For payout invoices, add period to gross earnings line
+                    if (isPayout &&
+                        desc == 'Gross earnings' &&
+                        createdAt != null) {
+                      final periodStart = inv['periodStart'] as Timestamp?;
+                      final periodEnd = inv['periodEnd'] as Timestamp?;
+                      if (periodStart != null && periodEnd != null) {
+                        desc =
+                            'Gross earnings\n${DateFormat('dd MMM').format(periodStart.toDate())} – ${DateFormat('dd MMM yyyy').format(periodEnd.toDate())}';
+                      } else {
+                        desc =
+                            'Gross earnings\nup to ${DateFormat('dd MMM yyyy').format(createdAt)}';
+                      }
+                    }
                     return Column(children: [
                       Padding(
                         padding: const EdgeInsets.symmetric(
@@ -281,7 +309,9 @@ class ProviderInvoiceDetailScreen extends StatelessWidget {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          'Transaction fee (1.5%) + Platform fee (2%) = R ${(txFee + platformFee).toStringAsFixed(2)} charged to client',
+                          isPayout
+                              ? 'Commission (2%) + Transaction fee (1.5%) = R ${(((inv['commission'] as num?)?.toDouble() ?? 0) + txFee).toStringAsFixed(2)} deducted from gross earnings'
+                              : 'Transaction fee (1.5%) + Platform fee (2%) = R ${(txFee + platformFee).toStringAsFixed(2)} charged to client',
                           style:
                               TextStyle(fontSize: 11, color: Colors.grey[500]),
                         ),
@@ -291,19 +321,21 @@ class ProviderInvoiceDetailScreen extends StatelessWidget {
                   Divider(height: 1, color: Colors.grey.shade200),
 
                   // Client total
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 11),
-                    child: Row(children: [
-                      Expanded(
-                          child: Text('Client Total (incl. fees)',
-                              style: TextStyle(
-                                  fontSize: 13, color: Colors.grey[600]))),
-                      Text('R ${grandTotal.toStringAsFixed(2)}',
-                          style:
-                              TextStyle(fontSize: 13, color: Colors.grey[600])),
-                    ]),
-                  ),
+                  if (!isPayout) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 11),
+                      child: Row(children: [
+                        Expanded(
+                            child: Text('Client Total (incl. fees)',
+                                style: TextStyle(
+                                    fontSize: 13, color: Colors.grey[600]))),
+                        Text('R ${grandTotal.toStringAsFixed(2)}',
+                            style: TextStyle(
+                                fontSize: 13, color: Colors.grey[600])),
+                      ]),
+                    ),
+                  ],
 
                   if (callOutFeePaid > 0) ...[
                     Divider(height: 1, color: Colors.grey.shade200),
@@ -346,7 +378,7 @@ class ProviderInvoiceDetailScreen extends StatelessWidget {
                   }),
 
                   // Outstanding
-                  if (!isPaid)
+                  if (!isPaid && !isPayout)
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 12),
