@@ -67,6 +67,9 @@ class ProviderInvoiceDetailScreen extends StatelessWidget {
               0;
           final txFee = (inv['transactionFee'] as num?)?.toDouble() ?? 0;
           final platformFee = (inv['platformFee'] as num?)?.toDouble() ?? 0;
+          final grossAmt = (inv['grossAmount'] as num?)?.toDouble() ??
+              (inv['payoutAmount'] as num?)?.toDouble() ??
+              grandTotal;
           final outstandingBalance =
               (inv['outstandingBalance'] as num?)?.toDouble() ?? grandTotal;
           final callOutFeePaid =
@@ -310,8 +313,8 @@ class ProviderInvoiceDetailScreen extends StatelessWidget {
                       Expanded(
                         child: Text(
                           isPayout
-                              ? 'Commission (2%) + Transaction fee (1.5%) = R ${(((inv['commission'] as num?)?.toDouble() ?? 0) + txFee).toStringAsFixed(2)} deducted from gross earnings'
-                              : 'Transaction fee (1.5%) + Platform fee (2%) = R ${(txFee + platformFee).toStringAsFixed(2)} charged to client',
+                              ? 'Commission (${grossAmt > 0 ? (((inv['commission'] as num?)?.toDouble() ?? 0) / grossAmt * 100).toStringAsFixed(1) : '0'}%) + Transaction fee (${grossAmt > 0 ? (txFee / grossAmt * 100).toStringAsFixed(1) : '0'}%) = R ${(((inv['commission'] as num?)?.toDouble() ?? 0) + txFee).toStringAsFixed(2)} deducted from gross earnings'
+                              : 'Transaction fee (${grandTotal > 0 ? (txFee / grandTotal * 100).toStringAsFixed(1) : '0'}%) + Platform fee (${grandTotal > 0 ? (platformFee / grandTotal * 100).toStringAsFixed(1) : '0'}%) = R ${(txFee + platformFee).toStringAsFixed(2)} charged to client',
                           style:
                               TextStyle(fontSize: 11, color: Colors.grey[500]),
                         ),

@@ -40,12 +40,19 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen>
     _invoicesSub = FirebaseFirestore.instance
         .collection('invoices')
         .where('providerId', isEqualTo: _uid)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .listen((snap) {
-      _allInvoices = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+      final docs = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+      docs.sort((a, b) {
+        final aTs = a['createdAt'] as Timestamp?;
+        final bTs = b['createdAt'] as Timestamp?;
+        if (aTs == null || bTs == null) return 0;
+        return bTs.compareTo(aTs);
+      });
+      _allInvoices = docs;
       if (mounted) setState(() => _isLoading = false);
-    }, onError: (_) {
+    }, onError: (e) {
+      debugPrint('[ProviderEarnings] query error: $e');
       if (mounted) setState(() => _isLoading = false);
     });
   }
