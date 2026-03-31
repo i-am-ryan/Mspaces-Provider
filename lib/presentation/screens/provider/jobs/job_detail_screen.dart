@@ -97,6 +97,103 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     }
   }
 
+  void _showRescheduleDialog(BuildContext context, Map<String, dynamic> data) {
+    DateTime selectedDate = DateTime.now().add(const Duration(days: 1));
+    final messageCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) => AlertDialog(
+          title: const Text('Propose New Date'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Select a new date to propose to the client:',
+                style: TextStyle(fontSize: 13, color: Colors.grey)),
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: ctx,
+                  initialDate: selectedDate,
+                  firstDate: DateTime.now().add(const Duration(days: 1)),
+                  lastDate: DateTime.now().add(const Duration(days: 90)),
+                );
+                if (picked != null) setDialog(() => selectedDate = picked);
+              },
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.calendar_today_outlined, size: 18),
+                  const SizedBox(width: 10),
+                  Text(
+                      '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w500)),
+                ]),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: messageCtrl,
+              maxLines: 2,
+              decoration: InputDecoration(
+                hintText: 'Reason for rescheduling (optional)',
+                filled: true,
+                fillColor: Colors.grey.shade50,
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ]),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                setState(() => _isUpdating = true);
+                try {
+                  await FirebaseFunctions.instanceFor(region: 'europe-west4')
+                      .httpsCallable('rescheduleBooking')
+                      .call({
+                    'bookingId': widget.bookingId,
+                    'newScheduledDate': selectedDate.toIso8601String(),
+                    'message': messageCtrl.text.trim(),
+                  });
+                  if (mounted)
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('New date proposed. Client notified.'),
+                        backgroundColor: Colors.green,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                } catch (e) {
+                  if (mounted)
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Error: $e'),
+                        backgroundColor: Colors.red));
+                } finally {
+                  if (mounted) setState(() => _isUpdating = false);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black, foregroundColor: Colors.white),
+              child: const Text('Send Proposal'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _markComplete(Map<String, dynamic> data) async {
     if (_workNotesCtrl.text.trim().isEmpty) {
       _snack('Please add work notes', error: true);
@@ -711,6 +808,74 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       ]),
       child: SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
+          // Pending provider confirmation — Confirm or Reschedule
+          if (status == 'pending_provider_confirmation') ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isUpdating
+                    ? null
+                    : () async {
+                        setState(() => _isUpdating = true);
+                        try {
+                          await FirebaseFunctions.instanceFor(
+                                  region: 'europe-west4')
+                              .httpsCallable('confirmBookingDate')
+                              .call({'bookingId': widget.bookingId});
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'Booking confirmed! Client notified to pay deposit.'),
+                                backgroundColor: Colors.green,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted)
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text('Error: $e'),
+                                backgroundColor: Colors.red));
+                        } finally {
+                          if (mounted) setState(() => _isUpdating = false);
+                        }
+                      },
+                icon:
+                    const Icon(Icons.check_circle_outline, color: Colors.white),
+                label: const Text('Confirm Booking Date',
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _isUpdating
+                    ? null
+                    : () => _showRescheduleDialog(context, data),
+                icon: const Icon(Icons.calendar_today_outlined,
+                    color: Colors.black),
+                label: const Text('Propose New Date',
+                    style: TextStyle(
+                        color: Colors.black, fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.black),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           // Show on-site quote button if callout fee paid
           //Assesment complete button
           if ((status == 'confirmed' || status == 'accepted') &&
