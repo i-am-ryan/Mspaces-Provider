@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -9,7 +10,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -17,7 +19,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    
+
     _controller = AnimationController(
       duration: const Duration(milliseconds: 1800),
       vsync: this,
@@ -34,11 +36,31 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _controller.forward();
 
     // Navigate after splash — check auth state first
-    Future.delayed(const Duration(milliseconds: 2500), () {
+    Future.delayed(const Duration(milliseconds: 2500), () async {
       if (!mounted) return;
       final user = FirebaseAuth.instance.currentUser;
       if (user != null && user.emailVerified) {
-        context.go('/provider-dashboard');
+        // Check if onboarding is completed
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        bool onboardingDone = true;
+        if (uid != null) {
+          try {
+            final userDoc = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(uid)
+                .get();
+            final data = userDoc.data() ?? {};
+            onboardingDone = data['onboardingCompleted'] as bool? ?? false;
+            final address = data['address'] as Map?;
+            if (address?['latitude'] != null) onboardingDone = true;
+          } catch (_) {}
+        }
+        if (!mounted) return;
+        if (!onboardingDone) {
+          context.go('/provider-onboarding');
+        } else {
+          context.go('/provider-dashboard');
+        }
       } else {
         context.go('/provider-login');
       }
@@ -77,7 +99,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               );
             },
           ),
-          
+
           // Gradient overlay
           Container(
             decoration: BoxDecoration(
@@ -92,7 +114,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               ),
             ),
           ),
-          
+
           // Animated content
           FadeTransition(
             opacity: _fadeAnimation,
@@ -121,9 +143,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       color: Colors.black,
                     ),
                   ),
-                  
+
                   const SizedBox(height: 40),
-                  
+
                   // App name
                   Text(
                     'MSPACES',
@@ -141,9 +163,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       ],
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Subtitle
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 48),
@@ -164,9 +186,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 8),
-                  
+
                   // Tagline
                   Text(
                     'Connect. Serve. Earn.',
@@ -186,7 +208,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               ),
             ),
           ),
-          
+
           // Loading indicator
           Positioned(
             bottom: 60,

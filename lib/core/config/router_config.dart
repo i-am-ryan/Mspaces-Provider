@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../presentation/screens/provider/onboarding/provider_onboarding_screen.dart';
 import '../../presentation/screens/provider/jobs/create_quote_screen.dart';
 import '../../presentation/screens/provider/earnings/provider_invoice_detail_screen.dart';
 import '../../presentation/screens/provider/jobs/provider_quote_detail_screen.dart';
@@ -74,6 +75,11 @@ class AppRouter {
         path: '/provider-verification',
         name: 'provider-verification',
         builder: (context, state) => const ProviderVerificationScreen(),
+      ),
+      GoRoute(
+        path: '/provider-onboarding',
+        name: 'provider-onboarding',
+        builder: (context, state) => const ProviderOnboardingScreen(),
       ),
 
       // ── Dashboard ───────────────────────────────────────────────
