@@ -106,8 +106,8 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
       // Search by name
       final nameSnap = await _firestore
           .collection('users')
-          .where('displayName', isGreaterThanOrEqualTo: query)
-          .where('displayName', isLessThanOrEqualTo: '$query\uf8ff')
+          .where('fullName', isGreaterThanOrEqualTo: query)
+          .where('fullName', isLessThanOrEqualTo: '$query\uf8ff')
           .limit(5)
           .get();
 
@@ -139,7 +139,7 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
   void _selectClient(Map<String, dynamic> client) {
     setState(() {
       _clientId = client['id']?.toString() ?? '';
-      _clientName = client['displayName']?.toString() ??
+      _clientName = client['fullName']?.toString() ??
           client['fullName']?.toString() ??
           '';
       _clientEmail = client['email']?.toString() ?? '';
@@ -195,7 +195,7 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
       if (provName.isEmpty) {
         final provDoc =
             await _firestore.collection('service_providers').doc(_uid).get();
-        provName = provDoc.data()?['displayName']?.toString() ??
+        provName = provDoc.data()?['fullName']?.toString() ??
             FirebaseAuth.instance.currentUser?.displayName ??
             '';
       }
@@ -753,7 +753,7 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
           ),
           child: Column(
             children: _searchResults.map((client) {
-              final name = client['displayName']?.toString() ??
+              final name = client['fullName']?.toString() ??
                   client['fullName']?.toString() ??
                   '';
               final email = client['email']?.toString() ?? '';
