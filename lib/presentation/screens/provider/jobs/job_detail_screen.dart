@@ -10,6 +10,8 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'dart:async';
+import 'package:geolocator/geolocator.dart';
 
 class JobDetailScreen extends StatefulWidget {
   final String bookingId;
@@ -20,6 +22,9 @@ class JobDetailScreen extends StatefulWidget {
 
 class _JobDetailScreenState extends State<JobDetailScreen> {
   bool _isUpdating = false;
+  // Journey tracking
+  Timer? _locationTimer;
+  bool _isOnRoute = false;
   bool _showCompletionForm = false;
   final _workNotesCtrl = TextEditingController();
   final List<File> _completionPhotos = [];
@@ -35,6 +40,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   @override
   void dispose() {
     _workNotesCtrl.dispose();
+    _locationTimer?.cancel();
     super.dispose();
   }
 
@@ -76,6 +82,117 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       urls.add(await task.ref.getDownloadURL());
     }
     return urls;
+  }
+
+  Future<void> _startJourney() async {
+    setState(() => _isUpdating = true);
+    try {
+      await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(widget.bookingId)
+          .update({
+        'status': 'provider_en_route',
+        'journeyStartedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      setState(() => _isOnRoute = true);
+      // Notify client
+      final bookingDoc = await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(widget.bookingId)
+          .get();
+      final clientId = bookingDoc.data()?['clientId']?.toString() ?? '';
+      if (clientId.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(clientId)
+            .collection('notifications')
+            .add({
+          'title': 'Provider On The Way!',
+          'body': 'Your service provider has started their journey to you.',
+          'type': 'provider_en_route',
+          'bookingId': widget.bookingId,
+          'read': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+      // Start location updates every 2 minutes
+      _startLocationUpdates();
+      _snack('Journey started! Client has been notified.');
+    } catch (e) {
+      _snack('Failed: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _isUpdating = false);
+    }
+  }
+
+  void _startLocationUpdates() {
+    _locationTimer?.cancel();
+    _updateProviderLocation(); // Send immediately
+    _locationTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      _updateProviderLocation();
+    });
+  }
+
+  Future<void> _updateProviderLocation() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) return;
+      final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+      await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(widget.bookingId)
+          .update({
+        'providerLocation': {
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _arrivedAtLocation() async {
+    setState(() => _isUpdating = true);
+    try {
+      _locationTimer?.cancel();
+      setState(() => _isOnRoute = false);
+      await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(widget.bookingId)
+          .update({
+        'status': 'provider_arrived',
+        'arrivedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      // Notify client
+      final bookingDoc = await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(widget.bookingId)
+          .get();
+      final clientId = bookingDoc.data()?['clientId']?.toString() ?? '';
+      if (clientId.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(clientId)
+            .collection('notifications')
+            .add({
+          'title': 'Provider Has Arrived!',
+          'body': 'Your service provider has arrived at your location.',
+          'type': 'provider_arrived',
+          'bookingId': widget.bookingId,
+          'read': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+      _snack('Arrival confirmed! Client notified.');
+    } catch (e) {
+      _snack('Failed: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _isUpdating = false);
+    }
   }
 
   Future<void> _startJob() async {
@@ -463,6 +580,16 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         color = Colors.orange;
         text = 'ACCEPTED';
         icon = Icons.check_circle_outline;
+        break;
+      case 'provider_en_route':
+        color = Colors.blue;
+        text = 'Provider is on the way';
+        icon = Icons.navigation_outlined;
+        break;
+      case 'provider_arrived':
+        color = Colors.green;
+        text = 'Provider has arrived';
+        icon = Icons.location_on_outlined;
         break;
       case 'in_progress':
         color = Colors.blue;
@@ -922,8 +1049,50 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             const SizedBox(height: 10),
           ],
 
-          // Start Job button
+          // Start Journey button
           if (status == 'confirmed' || status == 'accepted') ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isUpdating ? null : _startJourney,
+                icon: const Icon(Icons.navigation, color: Colors.white),
+                label: const Text('Start Journey to Client',
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w600)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+
+          // I Have Arrived button
+          if (status == 'provider_en_route') ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isUpdating ? null : _arrivedAtLocation,
+                icon: const Icon(Icons.location_on, color: Colors.white),
+                label: const Text('I Have Arrived',
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w600)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+
+          // Start Job button (after arrived)
+          if (status == 'provider_arrived') ...[
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
