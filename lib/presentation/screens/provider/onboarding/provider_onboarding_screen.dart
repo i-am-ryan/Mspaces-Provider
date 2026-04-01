@@ -114,6 +114,24 @@ class _ProviderOnboardingScreenState extends State<ProviderOnboardingScreen> {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return;
 
+      // If no GPS coords yet, try to geocode the entered address
+      if (_latitude == null && _cityCtrl.text.isNotEmpty) {
+        try {
+          final query = [
+            _streetCtrl.text,
+            _suburbCtrl.text,
+            _cityCtrl.text,
+            _provinceCtrl.text,
+            'South Africa'
+          ].where((s) => s.isNotEmpty).join(', ');
+          final locations = await locationFromAddress(query);
+          if (locations.isNotEmpty) {
+            _latitude = locations.first.latitude;
+            _longitude = locations.first.longitude;
+          }
+        } catch (_) {}
+      }
+
       // Update users collection
       await FirebaseFirestore.instance.collection('users').doc(uid).update({
         'address': {
@@ -164,7 +182,7 @@ class _ProviderOnboardingScreenState extends State<ProviderOnboardingScreen> {
         });
       }
 
-      if (mounted) context.go('/provider-home');
+      if (mounted) context.go('/provider-dashboard');
     } catch (e) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(

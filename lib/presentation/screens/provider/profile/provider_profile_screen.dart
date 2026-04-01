@@ -251,6 +251,20 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
     double? lng,
   }) async {
     try {
+      // If no GPS coords, geocode the entered address
+      if (lat == null && city.isNotEmpty) {
+        try {
+          final query = [suburb, city, province, 'South Africa']
+              .where((s) => s.isNotEmpty)
+              .join(', ');
+          final locations = await locationFromAddress(query);
+          if (locations.isNotEmpty) {
+            lat = locations.first.latitude;
+            lng = locations.first.longitude;
+          }
+        } catch (_) {}
+      }
+
       await _firestore.collection('service_providers').doc(_uid).update({
         'bio': bio,
         'about': bio,
