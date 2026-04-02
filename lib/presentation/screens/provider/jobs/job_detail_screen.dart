@@ -12,6 +12,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class JobDetailScreen extends StatefulWidget {
   final String bookingId;
@@ -87,6 +88,16 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   Future<void> _startJourney() async {
     setState(() => _isUpdating = true);
     try {
+      // Get destination coordinates from booking
+      final bookingDoc = await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(widget.bookingId)
+          .get();
+      final data = bookingDoc.data()!;
+      final destLat = (data['latitude'] as num?)?.toDouble();
+      final destLng = (data['longitude'] as num?)?.toDouble();
+      final destAddress = data['address']?.toString() ?? '';
+
       await FirebaseFirestore.instance
           .collection('bookings')
           .doc(widget.bookingId)
@@ -96,11 +107,24 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         'updatedAt': FieldValue.serverTimestamp(),
       });
       setState(() => _isOnRoute = true);
+
+      // Launch Google Maps navigation
+      Uri mapsUri;
+      if (destLat != null && destLng != null) {
+        mapsUri = Uri.parse('google.navigation:q=$destLat,$destLng&mode=d');
+        if (!await launchUrl(mapsUri)) {
+          // Fallback to browser maps
+          mapsUri = Uri.parse(
+              'https://www.google.com/maps/dir/?api=1&destination=$destLat,$destLng&travelmode=driving');
+          await launchUrl(mapsUri, mode: LaunchMode.externalApplication);
+        }
+      } else if (destAddress.isNotEmpty) {
+        final encoded = Uri.encodeComponent(destAddress);
+        mapsUri = Uri.parse(
+            'https://www.google.com/maps/dir/?api=1&destination=$encoded&travelmode=driving');
+        await launchUrl(mapsUri, mode: LaunchMode.externalApplication);
+      }
       // Notify client
-      final bookingDoc = await FirebaseFirestore.instance
-          .collection('bookings')
-          .doc(widget.bookingId)
-          .get();
       final clientId = bookingDoc.data()?['clientId']?.toString() ?? '';
       if (clientId.isNotEmpty) {
         await FirebaseFirestore.instance
