@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -10,6 +12,38 @@ class PayoutSettingsScreen extends StatefulWidget {
 
 class _PayoutSettingsScreenState extends State<PayoutSettingsScreen> {
   String _selectedPayoutMethod = 'bank';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBankingDetails();
+  }
+
+  Future<void> _loadBankingDetails() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      final doc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final banking = doc.data()?['bankingDetails'] as Map<String, dynamic>?;
+      if (banking != null && banking['accountNumber'] != null && mounted) {
+        final accNum = banking['accountNumber'].toString();
+        setState(() {
+          _savedAccounts.clear();
+          _savedAccounts.add({
+            'id': '1',
+            'type': 'bank',
+            'name': banking['bankName']?.toString() ?? 'Bank Account',
+            'details': accNum.length >= 4
+                ? '****${accNum.substring(accNum.length - 4)}'
+                : '****',
+            'isDefault': true,
+          });
+        });
+      }
+    } catch (_) {}
+  }
+
   bool _autoWithdraw = true;
   String _autoWithdrawThreshold = 'R1,000';
   bool _isProcessing = false;
@@ -723,9 +757,30 @@ class _PayoutSettingsScreenState extends State<PayoutSettingsScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     if (bankNameController.text.isNotEmpty &&
                         accountNumberController.text.isNotEmpty) {
+                      // Save to Firestore
+                      try {
+                        final uid = FirebaseAuth.instance.currentUser?.uid;
+                        if (uid != null) {
+                          await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(uid)
+                              .update({
+                            'bankingDetails': {
+                              'bankName': bankNameController.text.trim(),
+                              'accountNumber':
+                                  accountNumberController.text.trim(),
+                              'branchCode': branchCodeController.text.trim(),
+                              'accountType': 'Cheque / Current',
+                              'updatedAt': FieldValue.serverTimestamp(),
+                            },
+                            'hasBankingDetails': true,
+                            'updatedAt': FieldValue.serverTimestamp(),
+                          });
+                        }
+                      } catch (_) {}
                       setState(() {
                         _savedAccounts.add({
                           'id': DateTime.now().toString(),
@@ -733,13 +788,13 @@ class _PayoutSettingsScreenState extends State<PayoutSettingsScreen> {
                           'name': bankNameController.text,
                           'details':
                               '****${accountNumberController.text.substring(accountNumberController.text.length - 4)}',
-                          'isDefault': false,
+                          'isDefault': true,
                         });
                       });
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Bank account added successfully'),
+                          content: Text('Bank account saved successfully'),
                           backgroundColor: Colors.green,
                         ),
                       );

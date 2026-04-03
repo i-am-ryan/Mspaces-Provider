@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../../widgets/common/banking_details_banner.dart';
 
 class ProviderDashboardScreen extends StatefulWidget {
   const ProviderDashboardScreen({Key? key}) : super(key: key);
@@ -214,6 +215,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                             child: Column(
                               children: [
                                 _buildTopBar(displayName, isAvailable),
+                                BankingDetailsBanner(
+                                    route: '/provider-payout-settings'),
                                 Expanded(
                                   child: SingleChildScrollView(
                                     child: Column(
