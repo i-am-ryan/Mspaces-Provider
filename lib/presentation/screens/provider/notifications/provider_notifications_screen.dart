@@ -142,26 +142,26 @@ class _ProviderNotificationsScreenState
       case 'payment_received':
       case 'provider_en_route':
         if (bookingId != null) {
-          context.push('/job-detail', extra: bookingId);
+          context.push('/provider-job-detail', extra: bookingId);
         } else {
-          context.push('/active-jobs');
+          context.push('/provider-active-jobs');
         }
         break;
       case 'deposit_invoice':
       case 'invoice':
         if (invoiceId != null) {
-          context.push('/provider-invoice-detail', extra: invoiceId);
+          context.push('/invoice-detail', extra: invoiceId);
         } else {
           context.push('/provider-earnings');
         }
+        break;
+      case 'new_job_request':
+        context.push('/provider-job-requests');
         break;
       case 'payout_requested':
       case 'payout_approved':
       case 'payout_paid':
         context.push('/provider-earnings');
-        break;
-      case 'new_job_request':
-        context.push('/job-requests');
         break;
       default:
         context.push('/provider-dashboard');
