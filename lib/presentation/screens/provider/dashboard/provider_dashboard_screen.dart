@@ -328,7 +328,40 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
               ),
               IconButton(
                 onPressed: () => context.push('/provider-notifications'),
-                icon: const Icon(Icons.notifications_outlined, size: 24),
+                icon: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(FirebaseAuth.instance.currentUser?.uid)
+                      .collection('notifications')
+                      .where('read', isEqualTo: false)
+                      .snapshots(),
+                  builder: (context, snap) {
+                    final count = snap.data?.docs.length ?? 0;
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        const Icon(Icons.notifications_outlined, size: 24),
+                        if (count > 0)
+                          Positioned(
+                            top: -4,
+                            right: -4,
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: const BoxDecoration(
+                                  color: Colors.red, shape: BoxShape.circle),
+                              child: Text(
+                                count > 99 ? '99+' : '$count',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
               ),
             ],
           ),

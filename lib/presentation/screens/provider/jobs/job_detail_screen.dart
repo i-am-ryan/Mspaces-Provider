@@ -165,6 +165,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           permission == LocationPermission.deniedForever) return;
       final position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
+
       await FirebaseFirestore.instance
           .collection('bookings')
           .doc(widget.bookingId)
@@ -175,6 +176,44 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           'updatedAt': FieldValue.serverTimestamp(),
         },
       });
+
+      // Check if within 5 minutes — notify client
+      final bookingDoc = await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(widget.bookingId)
+          .get();
+      final data = bookingDoc.data();
+      if (data == null) return;
+      final destLat = (data['latitude'] as num?)?.toDouble();
+      final destLng = (data['longitude'] as num?)?.toDouble();
+      if (destLat != null && destLng != null) {
+        final distKm = Geolocator.distanceBetween(
+                position.latitude, position.longitude, destLat, destLng) /
+            1000;
+        final etaMins = (distKm / 30 * 60).round();
+        // Send 5-min notification only once
+        if (etaMins <= 5 && data['fiveMinNotificationSent'] != true) {
+          await FirebaseFirestore.instance
+              .collection('bookings')
+              .doc(widget.bookingId)
+              .update({'fiveMinNotificationSent': true});
+          final clientId = data['clientId']?.toString() ?? '';
+          if (clientId.isNotEmpty) {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(clientId)
+                .collection('notifications')
+                .add({
+              'title': 'Provider Almost There!',
+              'body': 'Your provider is about 5 minutes away.',
+              'type': 'provider_en_route',
+              'bookingId': widget.bookingId,
+              'read': false,
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+          }
+        }
+      }
     } catch (_) {}
   }
 
