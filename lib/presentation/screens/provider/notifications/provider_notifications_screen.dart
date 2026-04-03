@@ -41,7 +41,9 @@ class _ProviderNotificationsScreenState
         return {
           'docId': doc.id,
           ...data,
-          'createdAtDt': (data['createdAt'] as Timestamp?)?.toDate(),
+          'createdAtDt': data['createdAt'] is Timestamp
+              ? (data['createdAt'] as Timestamp).toDate()
+              : null,
         };
       }).toList();
     } catch (e) {
@@ -139,13 +141,25 @@ class _ProviderNotificationsScreenState
       case 'new_booking':
       case 'booking_confirmed':
       case 'deposit_required':
-      case 'payment_received':
       case 'provider_en_route':
         if (bookingId != null) {
           context.push('/provider-job-detail', extra: bookingId);
         } else {
           context.push('/provider-active-jobs');
         }
+        break;
+
+      case 'payment_received':
+        if (bookingId != null) {
+          context.push('/provider-job-detail', extra: bookingId);
+        } else {
+          context.push('/provider-earnings');
+        }
+        break;
+
+      case 'new_quote':
+      case 'new_job_request':
+        context.push('/provider-job-requests');
         break;
       case 'deposit_invoice':
       case 'invoice':
