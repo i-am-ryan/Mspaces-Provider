@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../../widgets/common/banner_notification_overlay.dart';
 import '../../../widgets/common/banking_details_banner.dart';
 
 class ProviderDashboardScreen extends StatefulWidget {
@@ -209,53 +210,56 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                             earningsSnap.data?.docs ?? []);
                         final weekTotal = _weekEarnings(earningsDocs);
 
-                        return Scaffold(
-                          backgroundColor: Colors.white,
-                          body: SafeArea(
-                            child: Column(
-                              children: [
-                                _buildTopBar(displayName, isAvailable),
-                                BankingDetailsBanner(
-                                    route: '/provider-payout-settings'),
-                                Expanded(
-                                  child: SingleChildScrollView(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildHeroBanner(
-                                            displayName, isAvailable),
-                                        Padding(
-                                          padding: const EdgeInsets.all(20),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              _buildStatsCards(
-                                                todayCount: weekDocs.length,
-                                                weekEarnings: weekTotal,
-                                                pendingCount: allPendingCount,
-                                              ),
-                                              const SizedBox(height: 24),
-                                              _buildQuickActions(),
-                                              const SizedBox(height: 24),
-                                              _buildPendingSection(pendingDocs,
-                                                  pendingQuoteDocs),
-                                              const SizedBox(height: 24),
-                                              _buildTodayScheduleSection(
-                                                  weekDocs),
-                                            ],
+                        return BannerNotificationOverlay(
+                          child: Scaffold(
+                            backgroundColor: Colors.white,
+                            body: SafeArea(
+                              child: Column(
+                                children: [
+                                  _buildTopBar(displayName, isAvailable),
+                                  BankingDetailsBanner(
+                                      route: '/provider-payout-settings'),
+                                  Expanded(
+                                    child: SingleChildScrollView(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          _buildHeroBanner(
+                                              displayName, isAvailable),
+                                          Padding(
+                                            padding: const EdgeInsets.all(20),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                _buildStatsCards(
+                                                  todayCount: weekDocs.length,
+                                                  weekEarnings: weekTotal,
+                                                  pendingCount: allPendingCount,
+                                                ),
+                                                const SizedBox(height: 24),
+                                                _buildQuickActions(),
+                                                const SizedBox(height: 24),
+                                                _buildPendingSection(
+                                                    pendingDocs,
+                                                    pendingQuoteDocs),
+                                                const SizedBox(height: 24),
+                                                _buildTodayScheduleSection(
+                                                    weekDocs),
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                        const SizedBox(height: 80),
-                                      ],
+                                          const SizedBox(height: 80),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
+                            bottomNavigationBar: _buildBottomNav(),
                           ),
-                          bottomNavigationBar: _buildBottomNav(),
                         );
                       },
                     );
