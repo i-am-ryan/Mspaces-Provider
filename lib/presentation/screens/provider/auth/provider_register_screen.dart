@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 class ProviderRegisterScreen extends StatefulWidget {
@@ -30,9 +32,12 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
   // Step 3: Location
   final _streetAddressController = TextEditingController();
   final _cityController = TextEditingController();
+  final _suburbController = TextEditingController();
   String _selectedProvince = 'Gauteng';
   final _postalCodeController = TextEditingController();
   double _serviceRadius = 15.0;
+  double? _regLat;
+  double? _regLng;
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -74,6 +79,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
     _yearsExperienceController.dispose();
     _descriptionController.dispose();
     _streetAddressController.dispose();
+    _suburbController.dispose();
     _cityController.dispose();
     _postalCodeController.dispose();
     super.dispose();
@@ -175,6 +181,16 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
         'email': email,
         'phone': phone,
         'userType': 'provider',
+        'address': {
+          'street': _streetAddressController.text.trim(),
+          'suburb': _suburbController.text.trim(),
+          'city': city,
+          'province': _selectedProvince,
+          'postalCode': postalCode,
+          if (_regLat != null) 'latitude': _regLat,
+          if (_regLng != null) 'longitude': _regLng,
+        },
+        'onboardingCompleted': true,
         'createdAt': now,
         'updatedAt': now,
       }, SetOptions(merge: true));
@@ -196,8 +212,11 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
         'coverageAreas': [
           {
             'city': city,
+            'suburb': _suburbController.text.trim(),
             'province': _selectedProvince,
             'postalCode': postalCode,
+            if (_regLat != null) 'latitude': _regLat,
+            if (_regLng != null) 'longitude': _regLng,
           }
         ],
         'serviceRadius': _serviceRadius.toInt(),
@@ -597,10 +616,67 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
             icon: Icons.location_on),
         const SizedBox(height: 16),
         _buildTextField(
-            controller: _cityController,
-            label: 'City',
-            hint: 'e.g., Johannesburg',
+            controller: _suburbController,
+            label: 'Suburb',
+            hint: 'e.g., Sandton',
             icon: Icons.location_city),
+        const SizedBox(height: 16),
+        Row(children: [
+          Expanded(
+            child: _buildTextField(
+                controller: _cityController,
+                label: 'City',
+                hint: 'e.g., Johannesburg',
+                icon: Icons.location_on),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.my_location, color: Colors.white),
+              tooltip: 'Use GPS',
+              onPressed: () async {
+                try {
+                  LocationPermission perm = await Geolocator.checkPermission();
+                  if (perm == LocationPermission.denied) {
+                    perm = await Geolocator.requestPermission();
+                  }
+                  if (perm == LocationPermission.denied ||
+                      perm == LocationPermission.deniedForever) return;
+                  final pos = await Geolocator.getCurrentPosition(
+                      desiredAccuracy: LocationAccuracy.high);
+                  final placemarks = await placemarkFromCoordinates(
+                      pos.latitude, pos.longitude);
+                  if (placemarks.isNotEmpty && mounted) {
+                    final place = placemarks.first;
+                    setState(() {
+                      _regLat = pos.latitude;
+                      _regLng = pos.longitude;
+                      _streetAddressController.text =
+                          '${place.subThoroughfare ?? ''} ${place.thoroughfare ?? ''}'
+                              .trim();
+                      _suburbController.text =
+                          place.subLocality ?? place.locality ?? '';
+                      _cityController.text = place.locality ?? '';
+                      _selectedProvince =
+                          _provinces.contains(place.administrativeArea)
+                              ? place.administrativeArea!
+                              : _selectedProvince;
+                      _postalCodeController.text = place.postalCode ?? '';
+                    });
+                  }
+                } catch (e) {
+                  if (mounted)
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(SnackBar(content: Text('GPS error: $e')));
+                }
+              },
+            ),
+          ),
+        ]),
         const SizedBox(height: 16),
         const Text('Province',
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
