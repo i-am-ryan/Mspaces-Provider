@@ -1,13 +1,11 @@
 // lib/presentation/widgets/common/banner_notification_overlay.dart
-
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-/// Wraps a screen and shows a sliding banner for new notifications.
-/// Usage: wrap your Scaffold with BannerNotificationOverlay
+/// Wraps a screen and shows a centered modal notification card for new notifications.
 class BannerNotificationOverlay extends StatefulWidget {
   final Widget child;
   const BannerNotificationOverlay({Key? key, required this.child})
@@ -21,7 +19,8 @@ class BannerNotificationOverlay extends StatefulWidget {
 class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<Offset> _slideAnimation;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
 
   StreamSubscription<QuerySnapshot>? _sub;
   final List<Map<String, dynamic>> _queue = [];
@@ -34,12 +33,11 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 350),
+      duration: const Duration(milliseconds: 300),
     );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, -1.5),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _scaleAnimation =
+        CurvedAnimation(parent: _controller, curve: Curves.easeOutBack);
+    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
 
     _listenToNotifications();
   }
@@ -69,11 +67,7 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
       for (final doc in snap.docChanges) {
         if (doc.type == DocumentChangeType.added) {
           final data = doc.doc.data() as Map<String, dynamic>;
-          final notification = {
-            'docId': doc.doc.id,
-            ...data,
-          };
-          _queue.add(notification);
+          _queue.add({'docId': doc.doc.id, ...data});
           if (!_showing) _showNext();
         }
       }
@@ -87,9 +81,8 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
       _showing = true;
     });
     _controller.forward(from: 0);
-    // Auto-hide after 120 seconds
     _autoHideTimer?.cancel();
-    _autoHideTimer = Timer(const Duration(seconds: 120), () {
+    _autoHideTimer = Timer(const Duration(seconds: 8), () {
       if (mounted) _dismiss();
     });
   }
@@ -102,12 +95,10 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
         _showing = false;
         _current = null;
       });
-      // Show next if queued
       if (_queue.isNotEmpty) {
-        Future.delayed(const Duration(milliseconds: 300), _showNext);
+        Future.delayed(const Duration(milliseconds: 200), _showNext);
       }
     });
-    // Mark as read
     _markCurrentAsRead();
   }
 
@@ -159,39 +150,29 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
             context.push('/provider-earnings');
           }
           break;
-
         case 'booking_confirmed':
         case 'provider_en_route':
         case 'provider_arrived':
         case 'booking_rescheduled':
         case 'rescheduled_pending_client':
         case 'deposit_invoice':
+        case 'booking_submitted':
           if (bookingId != null) {
-            FirebaseFirestore.instance
-                .collection('bookings')
-                .doc(bookingId)
-                .get()
-                .then((doc) {
-              if (doc.exists && mounted) {
-                context.push('/provider-job-detail', extra: bookingId);
-              } else if (mounted) {
-                context.push('/provider-active-jobs');
-              }
-            });
+            context.push('/provider-job-detail', extra: bookingId);
           } else {
             context.push('/provider-active-jobs');
           }
           break;
-
         case 'new_quote':
         case 'quote_ready':
+        case 'quote_received':
+        case 'quote_request_sent':
           if (quoteRequestId != null) {
             context.push('/quote-detail/$quoteRequestId');
           } else {
             context.push('/provider-active-jobs');
           }
           break;
-
         case 'service_request':
         case 'service_request_update':
           if (serviceRequestId != null) {
@@ -200,7 +181,6 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
             context.push('/provider-job-requests');
           }
           break;
-
         case 'invoice':
         case 'invoice_paid':
         case 'payment_received':
@@ -210,7 +190,6 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
             context.push('/provider-earnings');
           }
           break;
-
         default:
           context.push('/provider-notifications');
       }
@@ -222,26 +201,27 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
       case 'deposit_required':
       case 'pay_callout':
       case 'pay_deposit':
-        return const Color(0xFFB71C1C); // deep red
+        return const Color(0xFFB71C1C);
       case 'booking_confirmed':
       case 'provider_arrived':
-        return const Color(0xFF1B5E20); // deep green
+        return const Color(0xFF1B5E20);
       case 'provider_en_route':
-        return const Color(0xFF0D47A1); // deep blue
+        return const Color(0xFF0D47A1);
       case 'booking_rescheduled':
       case 'rescheduled_pending_client':
-        return const Color(0xFF4A148C); // deep purple
+        return const Color(0xFF4A148C);
       case 'new_quote':
       case 'quote_ready':
-        return const Color(0xFF1565C0); // blue
+      case 'quote_received':
+        return const Color(0xFF1565C0);
       case 'service_request':
       case 'service_request_update':
-        return const Color(0xFFE65100); // deep orange
+        return const Color(0xFFE65100);
       case 'invoice':
       case 'payment_received':
-        return const Color(0xFF2E7D32); // green
+        return const Color(0xFF2E7D32);
       default:
-        return const Color(0xFF212121); // near black
+        return const Color(0xFF212121);
     }
   }
 
@@ -262,6 +242,7 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
         return Icons.event_repeat_outlined;
       case 'new_quote':
       case 'quote_ready':
+      case 'quote_received':
         return Icons.request_quote_outlined;
       case 'service_request':
       case 'service_request_update':
@@ -290,6 +271,7 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
         return 'Review Date';
       case 'new_quote':
       case 'quote_ready':
+      case 'quote_received':
         return 'View Quote';
       case 'service_request':
       case 'service_request_update':
@@ -306,140 +288,165 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
     return Stack(children: [
       widget.child,
       if (_showing && _current != null)
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: SafeArea(
-            child: SlideTransition(
-              position: _slideAnimation,
-              child: GestureDetector(
-                onTap: _onNextStep,
-                onVerticalDragEnd: (details) {
-                  if (details.velocity.pixelsPerSecond.dy < -100) _dismiss();
-                },
-                child: Container(
-                  margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                  decoration: BoxDecoration(
-                    color: _getBannerColor(_current!['type']?.toString()),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x40000000),
-                        blurRadius: 16,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-                    child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Icon
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              _getBannerIcon(_current!['type']?.toString()),
-                              color: Colors.white,
-                              size: 20,
-                            ),
+        Positioned.fill(
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: GestureDetector(
+              onTap: _dismiss,
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.55),
+                child: Center(
+                  child: ScaleTransition(
+                    scale: _scaleAnimation,
+                    child: GestureDetector(
+                      onTap: () {}, // prevent dismiss on card tap
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 32),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A1A1A),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color:
+                                _getBannerColor(_current!['type']?.toString())
+                                    .withValues(alpha: 0.6),
+                            width: 1.5,
                           ),
-                          const SizedBox(width: 12),
-
-                          // Text content
-                          Expanded(
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _current!['title']?.toString() ??
-                                        'Notification',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                                  _getBannerColor(_current!['type']?.toString())
+                                      .withValues(alpha: 0.3),
+                              blurRadius: 24,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(28),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Icon circle
+                              Container(
+                                width: 64,
+                                height: 64,
+                                decoration: BoxDecoration(
+                                  color: _getBannerColor(
+                                          _current!['type']?.toString())
+                                      .withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: _getBannerColor(
+                                            _current!['type']?.toString())
+                                        .withValues(alpha: 0.5),
+                                    width: 1.5,
                                   ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    _current!['body']?.toString() ?? '',
-                                    style: TextStyle(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.85),
-                                      fontSize: 12,
-                                      height: 1.4,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 10),
+                                ),
+                                child: Icon(
+                                  _getBannerIcon(_current!['type']?.toString()),
+                                  color: _getBannerColor(
+                                      _current!['type']?.toString()),
+                                  size: 28,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
 
-                                  // Buttons row
-                                  Row(children: [
-                                    // Dismiss button
-                                    GestureDetector(
-                                      onTap: _dismiss,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
+                              // Divider line
+                              Container(
+                                height: 1,
+                                color: Colors.white.withValues(alpha: 0.1),
+                              ),
+                              const SizedBox(height: 20),
+
+                              // Title
+                              Text(
+                                _current!['title']?.toString() ??
+                                    'Notification',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: _getBannerColor(
+                                      _current!['type']?.toString()),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+
+                              // Body
+                              Text(
+                                _current!['body']?.toString() ?? '',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  fontSize: 14,
+                                  height: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 28),
+
+                              // Buttons row
+                              Row(children: [
+                                // Dismiss
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: _dismiss,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 14),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.08),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
                                           color: Colors.white
                                               .withValues(alpha: 0.15),
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                          border: Border.all(
-                                              color: Colors.white
-                                                  .withValues(alpha: 0.3)),
                                         ),
-                                        child: const Text('Dismiss',
-                                            style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600)),
                                       ),
-                                    ),
-                                    const SizedBox(width: 8),
-
-                                    // Next step button
-                                    GestureDetector(
-                                      onTap: _onNextStep,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
+                                      child: const Text(
+                                        'Dismiss',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
                                           color: Colors.white,
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          _getNextStepLabel(
-                                              _current!['type']?.toString()),
-                                          style: TextStyle(
-                                              color: _getBannerColor(
-                                                  _current!['type']
-                                                      ?.toString()),
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold),
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                     ),
-                                  ]),
-                                ]),
-                          ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
 
-                          // Close X
-                          GestureDetector(
-                            onTap: _dismiss,
-                            child: Icon(Icons.close,
-                                color: Colors.white.withValues(alpha: 0.7),
-                                size: 18),
+                                // Next step
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: _onNextStep,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 14),
+                                      decoration: BoxDecoration(
+                                        color: _getBannerColor(
+                                            _current!['type']?.toString()),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        _getNextStepLabel(
+                                            _current!['type']?.toString()),
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ]),
+                            ],
                           ),
-                        ]),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
