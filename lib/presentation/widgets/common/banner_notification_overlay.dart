@@ -5,7 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-/// Wraps a screen and shows a centered modal notification card for new notifications.
 class BannerNotificationOverlay extends StatefulWidget {
   final Widget child;
   const BannerNotificationOverlay({Key? key, required this.child})
@@ -33,12 +32,11 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 280),
     );
     _scaleAnimation =
         CurvedAnimation(parent: _controller, curve: Curves.easeOutBack);
     _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
-
     _listenToNotifications();
   }
 
@@ -53,7 +51,6 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
   void _listenToNotifications() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-
     _sub = FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
@@ -82,7 +79,7 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
     });
     _controller.forward(from: 0);
     _autoHideTimer?.cancel();
-    _autoHideTimer = Timer(const Duration(seconds: 8), () {
+    _autoHideTimer = Timer(const Duration(seconds: 120), () {
       if (mounted) _dismiss();
     });
   }
@@ -140,7 +137,7 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
                 .get()
                 .then((snap) {
               if (snap.docs.isNotEmpty && mounted) {
-                context.push('/pay-invoice',
+                context.push('/provider-earnings',
                     extra: {'invoiceId': snap.docs.first.id});
               } else if (mounted) {
                 context.push('/provider-earnings');
@@ -168,7 +165,7 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
         case 'quote_received':
         case 'quote_request_sent':
           if (quoteRequestId != null) {
-            context.push('/quote-detail/$quoteRequestId');
+            context.push('/provider-job-requests');
           } else {
             context.push('/provider-active-jobs');
           }
@@ -196,36 +193,7 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
     });
   }
 
-  Color _getBannerColor(String? type) {
-    switch (type) {
-      case 'deposit_required':
-      case 'pay_callout':
-      case 'pay_deposit':
-        return const Color(0xFFB71C1C);
-      case 'booking_confirmed':
-      case 'provider_arrived':
-        return const Color(0xFF1B5E20);
-      case 'provider_en_route':
-        return const Color(0xFF0D47A1);
-      case 'booking_rescheduled':
-      case 'rescheduled_pending_client':
-        return const Color(0xFF4A148C);
-      case 'new_quote':
-      case 'quote_ready':
-      case 'quote_received':
-        return const Color(0xFF1565C0);
-      case 'service_request':
-      case 'service_request_update':
-        return const Color(0xFFE65100);
-      case 'invoice':
-      case 'payment_received':
-        return const Color(0xFF2E7D32);
-      default:
-        return const Color(0xFF212121);
-    }
-  }
-
-  IconData _getBannerIcon(String? type) {
+  IconData _getIcon(String? type) {
     switch (type) {
       case 'deposit_required':
       case 'pay_callout':
@@ -261,11 +229,10 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
       case 'pay_deposit':
         return 'Pay Now';
       case 'booking_confirmed':
+      case 'provider_arrived':
         return 'View Booking';
       case 'provider_en_route':
         return 'Track Provider';
-      case 'provider_arrived':
-        return 'View Booking';
       case 'booking_rescheduled':
       case 'rescheduled_pending_client':
         return 'Review Date';
@@ -294,30 +261,23 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
             child: GestureDetector(
               onTap: _dismiss,
               child: Container(
-                color: Colors.black.withValues(alpha: 0.55),
+                color: Colors.black.withValues(alpha: 0.45),
                 child: Center(
                   child: ScaleTransition(
                     scale: _scaleAnimation,
                     child: GestureDetector(
-                      onTap: () {}, // prevent dismiss on card tap
+                      onTap: () {},
                       child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 32),
+                        margin: const EdgeInsets.symmetric(horizontal: 28),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1A1A1A),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color:
-                                _getBannerColor(_current!['type']?.toString())
-                                    .withValues(alpha: 0.6),
-                            width: 1.5,
-                          ),
-                          boxShadow: [
+                          border: Border.all(color: Colors.black, width: 1.5),
+                          boxShadow: const [
                             BoxShadow(
-                              color:
-                                  _getBannerColor(_current!['type']?.toString())
-                                      .withValues(alpha: 0.3),
+                              color: Color(0x33000000),
                               blurRadius: 24,
-                              spreadRadius: 2,
+                              offset: Offset(0, 8),
                             ),
                           ],
                         ),
@@ -331,31 +291,21 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
                                 width: 64,
                                 height: 64,
                                 decoration: BoxDecoration(
-                                  color: _getBannerColor(
-                                          _current!['type']?.toString())
-                                      .withValues(alpha: 0.2),
+                                  color: Colors.grey.shade100,
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: _getBannerColor(
-                                            _current!['type']?.toString())
-                                        .withValues(alpha: 0.5),
-                                    width: 1.5,
-                                  ),
+                                      color: Colors.black, width: 1.5),
                                 ),
                                 child: Icon(
-                                  _getBannerIcon(_current!['type']?.toString()),
-                                  color: _getBannerColor(
-                                      _current!['type']?.toString()),
+                                  _getIcon(_current!['type']?.toString()),
+                                  color: Colors.black,
                                   size: 28,
                                 ),
                               ),
                               const SizedBox(height: 20),
 
-                              // Divider line
-                              Container(
-                                height: 1,
-                                color: Colors.white.withValues(alpha: 0.1),
-                              ),
+                              // Divider
+                              const Divider(color: Colors.black12, height: 1),
                               const SizedBox(height: 20),
 
                               // Title
@@ -363,30 +313,32 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
                                 _current!['title']?.toString() ??
                                     'Notification',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: _getBannerColor(
-                                      _current!['type']?.toString()),
+                                style: const TextStyle(
+                                  color: Colors.black,
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
+                                  decoration: TextDecoration.none,
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 10),
 
                               // Body
                               Text(
                                 _current!['body']?.toString() ?? '',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.7),
+                                  color: Colors.grey[600],
                                   fontSize: 14,
                                   height: 1.5,
+                                  fontWeight: FontWeight.normal,
+                                  decoration: TextDecoration.none,
                                 ),
                               ),
                               const SizedBox(height: 28),
 
-                              // Buttons row
+                              // Buttons
                               Row(children: [
-                                // Dismiss
+                                // Dismiss — white with black border
                                 Expanded(
                                   child: GestureDetector(
                                     onTap: _dismiss,
@@ -394,21 +346,19 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
                                       padding: const EdgeInsets.symmetric(
                                           vertical: 14),
                                       decoration: BoxDecoration(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.08),
+                                        color: Colors.white,
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: Colors.white
-                                              .withValues(alpha: 0.15),
-                                        ),
+                                            color: Colors.black, width: 1.5),
                                       ),
                                       child: const Text(
                                         'Dismiss',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
-                                          color: Colors.white,
+                                          color: Colors.black,
                                           fontSize: 14,
                                           fontWeight: FontWeight.w600,
+                                          decoration: TextDecoration.none,
                                         ),
                                       ),
                                     ),
@@ -416,7 +366,7 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
                                 ),
                                 const SizedBox(width: 12),
 
-                                // Next step
+                                // Next step — black fill
                                 Expanded(
                                   child: GestureDetector(
                                     onTap: _onNextStep,
@@ -424,8 +374,7 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
                                       padding: const EdgeInsets.symmetric(
                                           vertical: 14),
                                       decoration: BoxDecoration(
-                                        color: _getBannerColor(
-                                            _current!['type']?.toString()),
+                                        color: Colors.black,
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
@@ -436,6 +385,7 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
                                           color: Colors.white,
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
+                                          decoration: TextDecoration.none,
                                         ),
                                       ),
                                     ),
