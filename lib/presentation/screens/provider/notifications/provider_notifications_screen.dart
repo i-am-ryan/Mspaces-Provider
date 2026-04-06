@@ -159,6 +159,7 @@ class _ProviderNotificationsScreenState
 
       case 'new_quote':
       case 'new_job_request':
+      case 'quote_request':
         context.push('/provider-job-requests');
         break;
       case 'deposit_invoice':
@@ -185,6 +186,7 @@ class _ProviderNotificationsScreenState
   IconData _iconForType(String? type) {
     switch (type) {
       case 'quote_accepted':
+      case 'quote_request':
         return Icons.request_quote_outlined;
       case 'new_booking':
       case 'booking_confirmed':

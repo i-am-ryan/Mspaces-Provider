@@ -87,9 +87,9 @@ class _BannerNotificationOverlayState extends State<BannerNotificationOverlay>
       _showing = true;
     });
     _controller.forward(from: 0);
-    // Auto-hide after 6 seconds
+    // Auto-hide after 120 seconds
     _autoHideTimer?.cancel();
-    _autoHideTimer = Timer(const Duration(seconds: 6), () {
+    _autoHideTimer = Timer(const Duration(seconds: 120), () {
       if (mounted) _dismiss();
     });
   }
