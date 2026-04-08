@@ -23,6 +23,7 @@ import '../../presentation/screens/provider/earnings/transactions_screen.dart';
 import '../../presentation/screens/provider/earnings/payout_settings_screen.dart';
 import '../../presentation/screens/provider/profile/provider_profile_screen.dart';
 import '../../presentation/screens/provider/services/services_management_screen.dart';
+import '../../presentation/screens/provider/chat/chat_detail_screen.dart';
 
 const _publicRoutes = {
   '/splash',
@@ -147,6 +148,19 @@ class AppRouter {
         builder: (context, state) {
           final invoiceId = state.extra as String? ?? '';
           return ProviderInvoiceDetailScreen(invoiceId: invoiceId);
+        },
+      ),
+
+      // ── Chat ────────────────────────────────────────────────
+      GoRoute(
+        path: '/provider-chat-detail',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>;
+          return ChatDetailScreen(
+            conversationId: extra['conversationId'] as String,
+            otherName: extra['otherName'] as String,
+            otherRole: extra['otherRole'] as String,
+          );
         },
       ),
 

@@ -305,19 +305,70 @@ class _ActiveJobsScreenState extends State<ActiveJobsScreen>
                 const SizedBox(width: 12),
               ],
               Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () =>
-                      context.push('/provider-job-detail', extra: bookingId),
-                  icon: const Icon(Icons.visibility, size: 18),
-                  label: const Text('View'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => context.push('/provider-job-detail',
+                          extra: bookingId),
+                      icon: const Icon(Icons.visibility, size: 18),
+                      label: const Text('View'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('conversations')
+                        .where('bookingId', isEqualTo: bookingId)
+                        .where('active', isEqualTo: true)
+                        .limit(1)
+                        .snapshots(),
+                    builder: (context, snap) {
+                      final convDocs = snap.data?.docs ?? [];
+                      if (convDocs.isEmpty) return const SizedBox.shrink();
+                      final convId = convDocs.first.id;
+                      final convData =
+                          convDocs.first.data() as Map<String, dynamic>;
+                      final unread = (convData['unreadProvider'] as int?) ?? 0;
+                      return Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          IconButton(
+                            onPressed: () =>
+                                context.push('/provider-chat-detail', extra: {
+                              'conversationId': convId,
+                              'otherName': clientName,
+                              'otherRole': 'client',
+                            }),
+                            icon: const Icon(Icons.chat_outlined),
+                            style: IconButton.styleFrom(
+                              backgroundColor: Colors.grey.shade100,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                          if (unread > 0)
+                            Positioned(
+                              right: 4,
+                              top: 4,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                    color: Colors.red, shape: BoxShape.circle),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ]),
               ),
             ]),
           ]),
