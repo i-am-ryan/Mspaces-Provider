@@ -397,10 +397,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       });
 
       await FirebaseFirestore.instance
-          .collection('transactions')
-          .doc(_uid)
-          .collection('entries')
-          .add({
+          .collection('job_completions')
+          .doc(widget.bookingId)
+          .set({
         'bookingId': widget.bookingId,
         'clientName': data['clientName'] ?? '',
         'serviceCategory': data['serviceCategory'] ??
@@ -412,8 +411,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         'status': 'completed',
         'providerId': _uid,
         'completedAt': FieldValue.serverTimestamp(),
+        'workNotes': _workNotesCtrl.text.trim(),
       });
-
       // Update provider job count
       await FirebaseFirestore.instance
           .collection('service_providers')

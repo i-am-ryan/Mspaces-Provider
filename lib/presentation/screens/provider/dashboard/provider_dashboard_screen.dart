@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../../widgets/common/offers_carousel.dart';
 import '../../../widgets/common/banner_notification_overlay.dart';
 import '../../../widgets/common/banking_details_banner.dart';
 
@@ -247,6 +248,10 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                                                 const SizedBox(height: 24),
                                                 _buildTodayScheduleSection(
                                                     weekDocs),
+                                                const SizedBox(height: 24),
+                                                const OffersCarousel(
+                                                    targetType: 'providers'),
+                                                const SizedBox(height: 80),
                                               ],
                                             ),
                                           ),

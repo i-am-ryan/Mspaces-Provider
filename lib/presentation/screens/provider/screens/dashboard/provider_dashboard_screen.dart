@@ -5,7 +5,8 @@ class ProviderDashboardScreen extends StatefulWidget {
   const ProviderDashboardScreen({Key? key}) : super(key: key);
 
   @override
-  State<ProviderDashboardScreen> createState() => _ProviderDashboardScreenState();
+  State<ProviderDashboardScreen> createState() =>
+      _ProviderDashboardScreenState();
 }
 
 class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
@@ -63,14 +64,16 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                      child: const Text('Cancel',
+                          style: TextStyle(color: Colors.grey)),
                     ),
                     TextButton(
                       onPressed: () {
                         Navigator.pop(context);
                         context.go('/provider-login');
                       },
-                      child: const Text('Logout', style: TextStyle(color: Colors.red)),
+                      child: const Text('Logout',
+                          style: TextStyle(color: Colors.red)),
                     ),
                   ],
                 ),
@@ -92,7 +95,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   image: DecorationImage(
-                    image: AssetImage('assets/images/benjamin-brunner-imEtY2Kpejk-unsplash.jpg'),
+                    image: AssetImage(
+                        'assets/images/benjamin-brunner-imEtY2Kpejk-unsplash.jpg'),
                     fit: BoxFit.cover,
                   ),
                   boxShadow: [
@@ -144,9 +148,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Stats Cards
               const Text(
                 'Your Stats',
@@ -157,7 +161,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              
+
               Row(
                 children: [
                   Expanded(
@@ -179,9 +183,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               Row(
                 children: [
                   Expanded(
@@ -203,9 +207,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Quick Actions
               const Text(
                 'Quick Actions',
@@ -216,59 +220,63 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              
+
               _buildActionButton(
                 'View Job Requests',
                 Icons.notifications_active,
                 Colors.orange,
                 () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Job requests feature coming soon')),
+                    const SnackBar(
+                        content: Text('Job requests feature coming soon')),
                   );
                 },
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               _buildActionButton(
                 'My Schedule',
                 Icons.calendar_today,
                 Colors.blue,
                 () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Schedule feature coming soon')),
+                    const SnackBar(
+                        content: Text('Schedule feature coming soon')),
                   );
                 },
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               _buildActionButton(
                 'Earnings & Payments',
                 Icons.account_balance_wallet,
                 Colors.green,
                 () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Earnings feature coming soon')),
+                    const SnackBar(
+                        content: Text('Earnings feature coming soon')),
                   );
                 },
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               _buildActionButton(
                 'My Profile',
                 Icons.person,
                 Colors.purple,
                 () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Profile feature coming soon')),
+                    const SnackBar(
+                        content: Text('Profile feature coming soon')),
                   );
                 },
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Recent Activity
               const Text(
                 'Recent Activity',
@@ -279,7 +287,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              
+
               _buildActivityItem(
                 'New job request from John Smith',
                 'Plumbing - Sandton',
@@ -287,7 +295,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                 Icons.work,
                 Colors.blue,
               ),
-              
+
               _buildActivityItem(
                 'Completed job for Mary Johnson',
                 'Electrical - Midrand',
@@ -295,7 +303,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                 Icons.check_circle,
                 Colors.green,
               ),
-              
+
               _buildActivityItem(
                 'Payment received',
                 'R850 for job #1234',
@@ -313,7 +321,14 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
           setState(() => _selectedIndex = index);
           if (index != 0) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('${["Home", "Jobs", "Schedule", "Messages", "Profile"][index]} feature coming soon')),
+              SnackBar(
+                  content: Text('${[
+                "Home",
+                "Jobs",
+                "Schedule",
+                "Messages",
+                "Profile"
+              ][index]} feature coming soon')),
             );
           }
         },
@@ -323,7 +338,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.work), label: 'Jobs'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Schedule'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_today), label: 'Schedule'),
           BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Messages'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
@@ -331,7 +347,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+      String label, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -365,7 +382,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     );
   }
 
-  Widget _buildActionButton(String title, IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildActionButton(
+      String title, IconData icon, Color color, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -410,7 +428,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     );
   }
 
-  Widget _buildActivityItem(String title, String subtitle, String time, IconData icon, Color color) {
+  Widget _buildActivityItem(
+      String title, String subtitle, String time, IconData icon, Color color) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
