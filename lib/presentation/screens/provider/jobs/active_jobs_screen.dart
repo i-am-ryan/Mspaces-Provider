@@ -330,8 +330,49 @@ class _ActiveJobsScreenState extends State<ActiveJobsScreen>
                         .limit(1)
                         .snapshots(),
                     builder: (context, snap) {
+                      if (snap.connectionState == ConnectionState.waiting) {
+                        return const SizedBox(width: 44, height: 44);
+                      }
                       final convDocs = snap.data?.docs ?? [];
-                      if (convDocs.isEmpty) return const SizedBox.shrink();
+                      if (convDocs.isEmpty) {
+                        return IconButton(
+                          onPressed: () async {
+                            // Create conversation for existing bookings
+                            try {
+                              final ref = await FirebaseFirestore.instance
+                                  .collection('conversations')
+                                  .add({
+                                'bookingId': bookingId,
+                                'clientId': d['clientId'] ?? d['userId'] ?? '',
+                                'clientName': clientName,
+                                'providerId':
+                                    FirebaseAuth.instance.currentUser?.uid,
+                                'providerName': d['providerName'] ?? '',
+                                'serviceCategory': d['serviceCategory'] ?? '',
+                                'active': true,
+                                'lastMessage': '',
+                                'lastMessageAt': FieldValue.serverTimestamp(),
+                                'unreadClient': 0,
+                                'unreadProvider': 0,
+                                'createdAt': FieldValue.serverTimestamp(),
+                              });
+                              if (context.mounted) {
+                                context.push('/provider-chat-detail', extra: {
+                                  'conversationId': ref.id,
+                                  'otherName': clientName,
+                                  'otherRole': 'client',
+                                });
+                              }
+                            } catch (_) {}
+                          },
+                          icon: const Icon(Icons.chat_outlined),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.grey.shade100,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                          ),
+                        );
+                      }
                       final convId = convDocs.first.id;
                       final convData =
                           convDocs.first.data() as Map<String, dynamic>;
