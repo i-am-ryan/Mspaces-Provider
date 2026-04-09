@@ -320,93 +320,55 @@ class _ActiveJobsScreenState extends State<ActiveJobsScreen>
                 ),
               ),
               const SizedBox(width: 8),
-              StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('conversations')
-                    .where('bookingId', isEqualTo: bookingId)
-                    .limit(1)
-                    .snapshots(),
-                builder: (context, snap) {
-                  if (snap.connectionState == ConnectionState.waiting) {
-                    return const SizedBox(width: 44, height: 44);
-                  }
-                  final convDocs = (snap.data?.docs ?? [])
+              IconButton(
+                onPressed: () async {
+                  final snap = await FirebaseFirestore.instance
+                      .collection('conversations')
+                      .where('bookingId', isEqualTo: bookingId)
+                      .limit(1)
+                      .get();
+                  final activeDocs = snap.docs
                       .where((d) => (d.data() as Map)['active'] == true)
                       .toList();
-                  if (convDocs.isEmpty) {
-                    return IconButton(
-                      onPressed: () async {
-                        // Create conversation for existing bookings
-                        try {
-                          final ref = await FirebaseFirestore.instance
-                              .collection('conversations')
-                              .add({
-                            'bookingId': bookingId,
-                            'clientId': d['clientId'] ?? d['userId'] ?? '',
-                            'clientName': clientName,
-                            'providerId':
-                                FirebaseAuth.instance.currentUser?.uid,
-                            'providerName': d['providerName'] ?? '',
-                            'serviceCategory': d['serviceCategory'] ?? '',
-                            'active': true,
-                            'lastMessage': '',
-                            'lastMessageAt': FieldValue.serverTimestamp(),
-                            'unreadClient': 0,
-                            'unreadProvider': 0,
-                            'createdAt': FieldValue.serverTimestamp(),
-                          });
-                          if (context.mounted) {
-                            context.push('/provider-chat-detail', extra: {
-                              'conversationId': ref.id,
-                              'otherName': clientName,
-                              'otherRole': 'client',
-                            });
-                          }
-                        } catch (_) {}
-                      },
-                      icon: const Icon(Icons.chat_outlined),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.grey.shade100,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                    );
+                  if (activeDocs.isNotEmpty && context.mounted) {
+                    context.push('/provider-chat-detail', extra: {
+                      'conversationId': activeDocs.first.id,
+                      'otherName': clientName,
+                      'otherRole': 'client',
+                    });
+                  } else if (context.mounted) {
+                    // Create conversation
+                    final ref = await FirebaseFirestore.instance
+                        .collection('conversations')
+                        .add({
+                      'bookingId': bookingId,
+                      'clientId': d['clientId'] ?? d['userId'] ?? '',
+                      'clientName': clientName,
+                      'providerId': FirebaseAuth.instance.currentUser?.uid,
+                      'providerName': d['providerName'] ?? '',
+                      'serviceCategory': d['serviceCategory'] ?? '',
+                      'active': true,
+                      'lastMessage': '',
+                      'lastMessageAt': FieldValue.serverTimestamp(),
+                      'unreadClient': 0,
+                      'unreadProvider': 0,
+                      'createdAt': FieldValue.serverTimestamp(),
+                    });
+                    if (context.mounted) {
+                      context.push('/provider-chat-detail', extra: {
+                        'conversationId': ref.id,
+                        'otherName': clientName,
+                        'otherRole': 'client',
+                      });
+                    }
                   }
-                  final convId = convDocs.first.id;
-                  final convData =
-                      convDocs.first.data() as Map<String, dynamic>;
-                  final unread = (convData['unreadProvider'] as int?) ?? 0;
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      IconButton(
-                        onPressed: () =>
-                            context.push('/provider-chat-detail', extra: {
-                          'conversationId': convId,
-                          'otherName': clientName,
-                          'otherRole': 'client',
-                        }),
-                        icon: const Icon(Icons.chat_outlined),
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.grey.shade100,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                        ),
-                      ),
-                      if (unread > 0)
-                        Positioned(
-                          right: 4,
-                          top: 4,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                                color: Colors.red, shape: BoxShape.circle),
-                          ),
-                        ),
-                    ],
-                  );
                 },
+                icon: const Icon(Icons.chat_outlined),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.grey.shade100,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
               ),
             ]),
           ]),
