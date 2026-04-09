@@ -1066,8 +1066,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             const SizedBox(height: 10),
           ],
 
-          // Onsite quote option — shown during in_progress
-          if (status == 'in_progress' && !_showCompletionForm) ...[
+          // Onsite quote option — callout path only
+          if (status == 'in_progress' &&
+              !_showCompletionForm &&
+              (data['source'] == null || data['source'] != 'quote') &&
+              data['paymentStatus'] == 'callout_paid') ...[
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
