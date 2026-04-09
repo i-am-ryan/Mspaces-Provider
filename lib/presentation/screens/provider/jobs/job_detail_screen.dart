@@ -1065,24 +1065,15 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             ),
             const SizedBox(height: 10),
           ],
-          // Show on-site quote button if callout fee paid
-          //Assesment complete button
-          if ((status == 'confirmed' || status == 'accepted') &&
-              data['paymentStatus'] == 'callout_paid') ...[
+
+          // Onsite quote option — shown during in_progress
+          if (status == 'in_progress' && !_showCompletionForm) ...[
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
+                icon: const Icon(Icons.request_quote_outlined,
+                    color: Colors.black),
                 onPressed: () async {
-                  try {
-                    await FirebaseFirestore.instance
-                        .collection('bookings')
-                        .doc(widget.bookingId)
-                        .update({
-                      'status': 'assessment_complete',
-                      'assessmentCompletedAt': FieldValue.serverTimestamp(),
-                      'updatedAt': FieldValue.serverTimestamp(),
-                    });
-                  } catch (_) {}
                   if (!mounted) return;
                   context.push('/provider-create-quote', extra: {
                     'bookingId': widget.bookingId,
@@ -1098,7 +1089,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     'providerName': data['providerName']?.toString() ?? '',
                   });
                 },
-                label: const Text('On-Site Assessment Complete',
+                label: const Text('Create Onsite Quote',
                     style: TextStyle(
                         color: Colors.black, fontWeight: FontWeight.w600)),
                 style: OutlinedButton.styleFrom(

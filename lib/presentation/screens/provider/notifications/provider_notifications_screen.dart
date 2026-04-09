@@ -150,10 +150,14 @@ class _ProviderNotificationsScreenState
         break;
 
       case 'payment_received':
-        if (bookingId != null) {
-          context.push('/provider-job-detail', extra: bookingId);
+        context.push('/provider-earnings');
+        break;
+      case 'job_completed_provider':
+        if (n['bookingId'] != null) {
+          context.push('/provider-job-detail',
+              extra: n['bookingId'].toString());
         } else {
-          context.push('/provider-earnings');
+          context.push('/provider-job-requests');
         }
         break;
 
