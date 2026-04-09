@@ -162,6 +162,7 @@ class _ProviderNotificationsScreenState
       case 'quote_request':
         context.push('/provider-job-requests');
         break;
+
       case 'deposit_invoice':
       case 'invoice':
         if (invoiceId != null) {
@@ -170,13 +171,27 @@ class _ProviderNotificationsScreenState
           context.push('/provider-earnings');
         }
         break;
+
       case 'new_job_request':
         context.push('/provider-job-requests');
         break;
+
       case 'payout_requested':
       case 'payout_approved':
       case 'payout_paid':
         context.push('/provider-earnings');
+        break;
+
+      case 'new_message':
+        final conversationId = n['conversationId']?.toString() ?? '';
+        final senderName = n['senderName']?.toString() ?? 'Client';
+        if (conversationId.isNotEmpty) {
+          context.push('/provider-chat-detail', extra: {
+            'conversationId': conversationId,
+            'otherName': senderName,
+            'otherRole': 'client',
+          });
+        }
         break;
       default:
         context.push('/provider-dashboard');

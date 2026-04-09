@@ -82,6 +82,37 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         'lastMessageAt': now,
         unreadField: FieldValue.increment(1),
       });
+      // Send notification to other party
+      try {
+        final convDoc = await FirebaseFirestore.instance
+            .collection('conversations')
+            .doc(widget.conversationId)
+            .get();
+        final convData = convDoc.data() as Map<String, dynamic>;
+        final otherUid = widget.otherRole == 'provider'
+            ? convData['providerId']?.toString()
+            : convData['clientId']?.toString();
+        if (otherUid != null && otherUid.isNotEmpty) {
+          final senderName = convData[widget.otherRole == 'provider'
+                      ? 'clientName'
+                      : 'providerName']
+                  ?.toString() ??
+              '';
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(otherUid)
+              .collection('notifications')
+              .add({
+            'title': 'New Message',
+            'body': text.length > 50 ? '${text.substring(0, 50)}...' : text,
+            'type': 'new_message',
+            'conversationId': widget.conversationId,
+            'senderName': senderName,
+            'read': false,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (_) {}
       // Scroll to bottom
       Future.delayed(const Duration(milliseconds: 100), () {
         if (_scrollCtrl.hasClients) {
@@ -252,7 +283,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               );
             }
             return Container(
-              padding: const EdgeInsets.fromLTRB(16, 8, 8, 16),
+              padding: EdgeInsets.fromLTRB(
+                  16, 8, 8, MediaQuery.of(context).padding.bottom + 16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border(top: BorderSide(color: Colors.grey.shade200)),
