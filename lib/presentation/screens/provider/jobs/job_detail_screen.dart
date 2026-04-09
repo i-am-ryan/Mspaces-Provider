@@ -1066,56 +1066,6 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             const SizedBox(height: 10),
           ],
 
-          // Onsite quote option — callout path only
-          if (status == 'in_progress' &&
-              !_showCompletionForm &&
-              (data['source'] == null || data['source'] != 'quote') &&
-              data['paymentStatus'] == 'callout_paid') ...[
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.request_quote_outlined,
-                    color: Colors.black),
-                onPressed: () async {
-                  try {
-                    await FirebaseFirestore.instance
-                        .collection('bookings')
-                        .doc(widget.bookingId)
-                        .update({
-                      'status': 'completed',
-                      'completedAt': FieldValue.serverTimestamp(),
-                      'assessmentComplete': true,
-                      'updatedAt': FieldValue.serverTimestamp(),
-                    });
-                  } catch (_) {}
-                  if (!mounted) return;
-                  context.push('/provider-create-quote', extra: {
-                    'bookingId': widget.bookingId,
-                    'clientId':
-                        (data['clientId'] ?? data['userId'])?.toString() ?? '',
-                    'clientName': data['clientName']?.toString() ?? 'Client',
-                    'category': data['serviceCategory']?.toString() ??
-                        data['category']?.toString() ??
-                        'Service',
-                    'address': data['address']?.toString() ?? '',
-                    'description': data['description']?.toString() ?? '',
-                    'providerId': data['providerId']?.toString() ?? _uid,
-                    'providerName': data['providerName']?.toString() ?? '',
-                  });
-                },
-                label: const Text('Create Onsite Quote',
-                    style: TextStyle(
-                        color: Colors.black, fontWeight: FontWeight.w600)),
-                style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.black),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12))),
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-
           // Start Journey button
           if (status == 'confirmed' || status == 'accepted') ...[
             SizedBox(
@@ -1197,30 +1147,82 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                 ),
               )
             else ...[
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _isUpdating ? null : () => _markComplete(data),
-                  icon: _isUpdating
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.check_circle_outline,
-                          color: Colors.white),
-                  label: Text(
-                      _isUpdating ? 'Submitting...' : 'Submit & Complete Job',
-                      style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w600)),
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      disabledBackgroundColor: Colors.grey.shade300,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12))),
+              Row(children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isUpdating ? null : () => _markComplete(data),
+                    icon: _isUpdating
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.check_circle_outline,
+                            color: Colors.white),
+                    label: Text(
+                        _isUpdating ? 'Submitting...' : 'Submit & Complete',
+                        style: const TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.w600)),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12))),
+                  ),
                 ),
-              ),
+                // Only show on callout path
+                if (data['source'] == null || data['source'] != 'quote') ...[
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _isUpdating
+                          ? null
+                          : () async {
+                              // First complete the job
+                              await _markComplete(data);
+                              if (!mounted) return;
+                              // Then open quote creation
+                              context.push('/provider-create-quote', extra: {
+                                'bookingId': widget.bookingId,
+                                'clientId': (data['clientId'] ?? data['userId'])
+                                        ?.toString() ??
+                                    '',
+                                'clientName':
+                                    data['clientName']?.toString() ?? 'Client',
+                                'category':
+                                    data['serviceCategory']?.toString() ??
+                                        data['category']?.toString() ??
+                                        'Service',
+                                'address': data['address']?.toString() ?? '',
+                                'description':
+                                    data['description']?.toString() ?? '',
+                                'providerId':
+                                    data['providerId']?.toString() ?? _uid,
+                                'providerName':
+                                    data['providerName']?.toString() ?? '',
+                                'projectName':
+                                    data['projectName']?.toString() ?? '',
+                                'projectNumber':
+                                    data['projectNumber']?.toString() ?? '',
+                              });
+                            },
+                      icon: const Icon(Icons.request_quote_outlined,
+                          color: Colors.white),
+                      label: const Text('Submit & Quote',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600)),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          disabledBackgroundColor: Colors.grey.shade300,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12))),
+                    ),
+                  ),
+                ],
+              ]),
               const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
