@@ -324,14 +324,15 @@ class _ActiveJobsScreenState extends State<ActiveJobsScreen>
                 stream: FirebaseFirestore.instance
                     .collection('conversations')
                     .where('bookingId', isEqualTo: bookingId)
-                    .where('active', isEqualTo: true)
                     .limit(1)
                     .snapshots(),
                 builder: (context, snap) {
                   if (snap.connectionState == ConnectionState.waiting) {
                     return const SizedBox(width: 44, height: 44);
                   }
-                  final convDocs = snap.data?.docs ?? [];
+                  final convDocs = (snap.data?.docs ?? [])
+                      .where((d) => (d.data() as Map)['active'] == true)
+                      .toList();
                   if (convDocs.isEmpty) {
                     return IconButton(
                       onPressed: () async {
