@@ -1077,6 +1077,17 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                 icon: const Icon(Icons.request_quote_outlined,
                     color: Colors.black),
                 onPressed: () async {
+                  try {
+                    await FirebaseFirestore.instance
+                        .collection('bookings')
+                        .doc(widget.bookingId)
+                        .update({
+                      'status': 'completed',
+                      'completedAt': FieldValue.serverTimestamp(),
+                      'assessmentComplete': true,
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    });
+                  } catch (_) {}
                   if (!mounted) return;
                   context.push('/provider-create-quote', extra: {
                     'bookingId': widget.bookingId,
