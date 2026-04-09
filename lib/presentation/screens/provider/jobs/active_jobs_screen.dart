@@ -319,8 +319,16 @@ class _ActiveJobsScreenState extends State<ActiveJobsScreen>
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              IconButton(
+            ]),
+          ]),
+        ),
+        // Chat action bar — mirrors client side
+        Container(
+          decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: Color(0x1A000000)))),
+          child: Row(children: [
+            Expanded(
+              child: TextButton.icon(
                 onPressed: () async {
                   final snap = await FirebaseFirestore.instance
                       .collection('conversations')
@@ -337,7 +345,6 @@ class _ActiveJobsScreenState extends State<ActiveJobsScreen>
                       'otherRole': 'client',
                     });
                   } else if (context.mounted) {
-                    // Create conversation
                     final ref = await FirebaseFirestore.instance
                         .collection('conversations')
                         .add({
@@ -363,14 +370,12 @@ class _ActiveJobsScreenState extends State<ActiveJobsScreen>
                     }
                   }
                 },
-                icon: const Icon(Icons.chat_outlined),
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.grey.shade100,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
+                icon: const Icon(Icons.chat_bubble_outline,
+                    size: 18, color: Colors.black),
+                label: const Text('Message',
+                    style: TextStyle(color: Colors.black)),
               ),
-            ]),
+            ),
           ]),
         ),
       ]),
