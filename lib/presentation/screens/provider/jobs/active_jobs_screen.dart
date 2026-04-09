@@ -217,11 +217,8 @@ class _ActiveJobsScreenState extends State<ActiveJobsScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                isInProgress ? Icons.build : Icons.check_circle_outline,
-                size: 16,
-                color: Colors.white,
-              ),
+              Icon(isInProgress ? Icons.build : Icons.check_circle_outline,
+                  size: 16, color: Colors.white),
               const SizedBox(width: 8),
               Text(statusText.toUpperCase(),
                   style: const TextStyle(
@@ -232,10 +229,12 @@ class _ActiveJobsScreenState extends State<ActiveJobsScreen>
           ),
         ),
 
+        // Card body
         Padding(
           padding: const EdgeInsets.all(16),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // Client info row
             Row(children: [
               CircleAvatar(
                 radius: 24,
@@ -270,6 +269,8 @@ class _ActiveJobsScreenState extends State<ActiveJobsScreen>
               ),
             ]),
             const SizedBox(height: 16),
+
+            // Address
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -286,6 +287,8 @@ class _ActiveJobsScreenState extends State<ActiveJobsScreen>
               ]),
             ),
             const SizedBox(height: 16),
+
+            // Action buttons
             Row(children: [
               if (clientPhone.isNotEmpty) ...[
                 Expanded(
@@ -322,61 +325,57 @@ class _ActiveJobsScreenState extends State<ActiveJobsScreen>
             ]),
           ]),
         ),
-        // Chat action bar — mirrors client side
+
+        // Chat action bar
         Container(
           decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: Color(0x1A000000)))),
-          child: Row(children: [
-            Expanded(
-              child: TextButton.icon(
-                onPressed: () async {
-                  final snap = await FirebaseFirestore.instance
-                      .collection('conversations')
-                      .where('bookingId', isEqualTo: bookingId)
-                      .limit(1)
-                      .get();
-                  final activeDocs = snap.docs
-                      .where((d) => (d.data() as Map)['active'] == true)
-                      .toList();
-                  if (activeDocs.isNotEmpty && context.mounted) {
-                    context.push('/provider-chat-detail', extra: {
-                      'conversationId': activeDocs.first.id,
-                      'otherName': clientName,
-                      'otherRole': 'client',
-                    });
-                  } else if (context.mounted) {
-                    final ref = await FirebaseFirestore.instance
-                        .collection('conversations')
-                        .add({
-                      'bookingId': bookingId,
-                      'clientId': d['clientId'] ?? d['userId'] ?? '',
-                      'clientName': clientName,
-                      'providerId': FirebaseAuth.instance.currentUser?.uid,
-                      'providerName': d['providerName'] ?? '',
-                      'serviceCategory': d['serviceCategory'] ?? '',
-                      'active': true,
-                      'lastMessage': '',
-                      'lastMessageAt': FieldValue.serverTimestamp(),
-                      'unreadClient': 0,
-                      'unreadProvider': 0,
-                      'createdAt': FieldValue.serverTimestamp(),
-                    });
-                    if (context.mounted) {
-                      context.push('/provider-chat-detail', extra: {
-                        'conversationId': ref.id,
-                        'otherName': clientName,
-                        'otherRole': 'client',
-                      });
-                    }
-                  }
-                },
-                icon: const Icon(Icons.chat_bubble_outline,
-                    size: 18, color: Colors.black),
-                label: const Text('Message',
-                    style: TextStyle(color: Colors.black)),
-              ),
-            ),
-          ]),
+          child: TextButton.icon(
+            onPressed: () async {
+              final snap = await FirebaseFirestore.instance
+                  .collection('conversations')
+                  .where('bookingId', isEqualTo: bookingId)
+                  .limit(1)
+                  .get();
+              final activeDocs = snap.docs
+                  .where((doc) => (doc.data() as Map)['active'] == true)
+                  .toList();
+              if (activeDocs.isNotEmpty && context.mounted) {
+                context.push('/provider-chat-detail', extra: {
+                  'conversationId': activeDocs.first.id,
+                  'otherName': clientName,
+                  'otherRole': 'client',
+                });
+              } else if (context.mounted) {
+                final ref = await FirebaseFirestore.instance
+                    .collection('conversations')
+                    .add({
+                  'bookingId': bookingId,
+                  'clientId': d['clientId'] ?? d['userId'] ?? '',
+                  'clientName': clientName,
+                  'providerId': FirebaseAuth.instance.currentUser?.uid,
+                  'providerName': d['providerName'] ?? '',
+                  'serviceCategory': d['serviceCategory'] ?? '',
+                  'active': true,
+                  'lastMessage': '',
+                  'lastMessageAt': FieldValue.serverTimestamp(),
+                  'unreadClient': 0,
+                  'unreadProvider': 0,
+                  'createdAt': FieldValue.serverTimestamp(),
+                });
+                if (context.mounted) {
+                  context.push('/provider-chat-detail', extra: {
+                    'conversationId': ref.id,
+                    'otherName': clientName,
+                    'otherRole': 'client',
+                  });
+                }
+              }
+            },
+            icon: const Icon(Icons.chat_bubble_outline,
+                size: 18, color: Colors.black),
+            label: const Text('Message', style: TextStyle(color: Colors.black)),
+          ),
         ),
       ]),
     );

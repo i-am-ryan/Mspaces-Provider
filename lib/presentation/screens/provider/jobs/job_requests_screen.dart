@@ -995,6 +995,62 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
               ],
             ]),
           ),
+          // Chat action bar
+          if (status == 'confirmed' ||
+              status == 'accepted' ||
+              status == 'in_progress' ||
+              status == 'assessment_complete')
+            Container(
+              decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: Color(0x1A000000)))),
+              child: TextButton.icon(
+                onPressed: () async {
+                  final snap = await FirebaseFirestore.instance
+                      .collection('conversations')
+                      .where('bookingId', isEqualTo: bookingId)
+                      .limit(1)
+                      .get();
+                  final activeDocs = snap.docs
+                      .where((d) => (d.data() as Map)['active'] == true)
+                      .toList();
+                  if (activeDocs.isNotEmpty && context.mounted) {
+                    context.push('/provider-chat-detail', extra: {
+                      'conversationId': activeDocs.first.id,
+                      'otherName': clientName,
+                      'otherRole': 'client',
+                    });
+                  } else if (context.mounted) {
+                    final ref = await FirebaseFirestore.instance
+                        .collection('conversations')
+                        .add({
+                      'bookingId': bookingId,
+                      'clientId': d['clientId'] ?? d['userId'] ?? '',
+                      'clientName': clientName,
+                      'providerId': FirebaseAuth.instance.currentUser?.uid,
+                      'providerName': d['providerName'] ?? '',
+                      'serviceCategory': category,
+                      'active': true,
+                      'lastMessage': '',
+                      'lastMessageAt': FieldValue.serverTimestamp(),
+                      'unreadClient': 0,
+                      'unreadProvider': 0,
+                      'createdAt': FieldValue.serverTimestamp(),
+                    });
+                    if (context.mounted) {
+                      context.push('/provider-chat-detail', extra: {
+                        'conversationId': ref.id,
+                        'otherName': clientName,
+                        'otherRole': 'client',
+                      });
+                    }
+                  }
+                },
+                icon: const Icon(Icons.chat_bubble_outline,
+                    size: 18, color: Colors.black),
+                label: const Text('Message',
+                    style: TextStyle(color: Colors.black)),
+              ),
+            ),
         ]),
       ),
     );
