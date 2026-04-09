@@ -48,6 +48,8 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
   late String _description;
   late String _providerId;
   late String _providerName;
+  String _projectName = '';
+  String _projectNumber = '';
 
   bool get _isStandalone =>
       widget.data['bookingId']?.toString().isEmpty ?? true;
@@ -64,6 +66,8 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
     _description = widget.data['description']?.toString() ?? '';
     _providerId = widget.data['providerId']?.toString() ?? _uid;
     _providerName = widget.data['providerName']?.toString() ?? '';
+    _projectName = widget.data['projectName']?.toString() ?? '';
+    _projectNumber = widget.data['projectNumber']?.toString() ?? '';
 
     _clientSelected = _clientId.isNotEmpty;
     if (_clientSelected) {
@@ -215,6 +219,8 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
         'category': _category.isNotEmpty ? _category : 'Service',
         'address': _address,
         'description': _description,
+        'projectName': _projectName.isNotEmpty ? _projectName : null,
+        'projectNumber': _projectNumber.isNotEmpty ? _projectNumber : null,
         'status': 'quoted',
         'source':
             _bookingId.isNotEmpty ? 'onsite_assessment' : 'provider_initiated',
@@ -570,6 +576,48 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
               ],
             ]),
           ),
+          const SizedBox(height: 16),
+
+          // Project fields
+          Row(children: [
+            Expanded(
+              child: TextField(
+                onChanged: (v) => _projectName = v,
+                decoration: InputDecoration(
+                  labelText: 'Project Name (optional)',
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade200)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade200)),
+                  contentPadding: const EdgeInsets.all(12),
+                ),
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                onChanged: (v) => _projectNumber = v,
+                decoration: InputDecoration(
+                  labelText: 'Project No. (optional)',
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade200)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade200)),
+                  contentPadding: const EdgeInsets.all(12),
+                ),
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+          ]),
           const SizedBox(height: 16),
 
           // Notes
