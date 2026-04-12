@@ -137,15 +137,16 @@ class _ProviderNotificationsScreenState
     final invoiceId = n['invoiceId']?.toString();
 
     switch (type) {
-      case 'quote_accepted':
       case 'new_booking':
+        context.push('/provider-job-requests', extra: {'tab': 0});
+        break;
       case 'booking_confirmed':
       case 'deposit_required':
       case 'provider_en_route':
         if (bookingId != null) {
           context.push('/provider-job-detail', extra: bookingId);
         } else {
-          context.push('/provider-active-jobs');
+          context.push('/provider-job-requests', extra: {'tab': 0});
         }
         break;
 
@@ -161,10 +162,14 @@ class _ProviderNotificationsScreenState
         }
         break;
 
-      case 'new_quote':
       case 'new_job_request':
+        context.push('/provider-job-requests', extra: {'tab': 0});
+        break;
+      case 'new_quote':
       case 'quote_request':
-        context.push('/provider-job-requests');
+      case 'quote_accepted':
+      case 'quote_declined':
+        context.push('/provider-job-requests', extra: {'tab': 1});
         break;
 
       case 'deposit_invoice':

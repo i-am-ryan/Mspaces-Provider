@@ -599,7 +599,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
               child: _buildQuickActionButton(
                 icon: Icons.history,
                 label: 'Job History',
-                onTap: () => context.push('/provider-job-requests'),
+                onTap: () =>
+                    context.push('/provider-job-requests', extra: {'tab': 2}),
               ),
             ),
           ],

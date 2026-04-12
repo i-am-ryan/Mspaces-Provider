@@ -8,8 +8,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 class JobRequestsScreen extends StatefulWidget {
-  const JobRequestsScreen({Key? key}) : super(key: key);
-
+  final int initialTab;
+  const JobRequestsScreen({Key? key, this.initialTab = 0}) : super(key: key);
   @override
   State<JobRequestsScreen> createState() => _JobRequestsScreenState();
 }
@@ -46,7 +46,8 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController =
+        TabController(length: 3, vsync: this, initialIndex: widget.initialTab);
   }
 
   @override

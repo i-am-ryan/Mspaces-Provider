@@ -105,7 +105,11 @@ class AppRouter {
       GoRoute(
         path: '/provider-job-requests',
         name: 'provider-job-requests',
-        builder: (context, state) => const JobRequestsScreen(),
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final tab = extra?['tab'] as int? ?? 0;
+          return JobRequestsScreen(initialTab: tab);
+        },
       ),
       GoRoute(
         path: '/provider-active-jobs',
