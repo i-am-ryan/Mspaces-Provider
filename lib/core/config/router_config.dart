@@ -9,7 +9,6 @@ import '../../presentation/screens/provider/jobs/provider_quote_detail_screen.da
 import '../../presentation/screens/provider/splash/splash_screen.dart';
 import '../../presentation/screens/provider/auth/provider_login_screen.dart';
 import '../../presentation/screens/provider/auth/provider_register_screen.dart';
-import '../../presentation/screens/provider/auth/provider_verification_screen.dart';
 import '../../presentation/screens/provider/auth/email_verification_screen.dart';
 import '../../presentation/screens/provider/dashboard/provider_dashboard_screen.dart';
 import '../../presentation/screens/provider/jobs/job_requests_screen.dart';
@@ -73,11 +72,6 @@ class AppRouter {
         path: '/provider-register',
         name: 'provider-register',
         builder: (context, state) => const ProviderRegisterScreen(),
-      ),
-      GoRoute(
-        path: '/provider-verification',
-        name: 'provider-verification',
-        builder: (context, state) => const ProviderVerificationScreen(),
       ),
       GoRoute(
         path: '/email-verification',
