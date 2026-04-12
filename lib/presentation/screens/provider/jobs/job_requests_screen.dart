@@ -55,7 +55,11 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
     super.dispose();
   }
 
+  bool _isAccepting = false;
+
   Future<void> _acceptJob(String bookingId) async {
+    if (_isAccepting) return;
+    setState(() => _isAccepting = true);
     try {
       // Check booking status first
       final doc = await FirebaseFirestore.instance
@@ -106,6 +110,8 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
             content: Text('Failed to confirm: $e'),
             backgroundColor: Colors.red));
       }
+    } finally {
+      if (mounted) setState(() => _isAccepting = false);
     }
   }
 
@@ -935,7 +941,8 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
-                      onPressed: () => _acceptJob(bookingId),
+                      onPressed:
+                          _isAccepting ? null : () => _acceptJob(bookingId),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.black,
                         foregroundColor: Colors.white,

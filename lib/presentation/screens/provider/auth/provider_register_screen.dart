@@ -229,34 +229,9 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
         'updatedAt': now,
       }, SetOptions(merge: true));
 
-      // 5. Send email verification
-      try {
-        await FirebaseAuth.instance.currentUser?.sendEmailVerification();
-      } catch (_) {}
-
-      // 6. Sign out — user must verify email before accessing the app
-      await FirebaseAuth.instance.signOut();
-
-      // 7. Show dialog then send to login
+      // 5. Route to OTP email verification
       if (mounted) {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Verify Your Email'),
-            content: const Text(
-                'A verification email has been sent to your email address. '
-                'Please verify your email before logging in.'),
-            actions: [
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
-                onPressed: () => context.go('/provider-login'),
-                child: const Text('Go to Login',
-                    style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
-        );
+        context.go('/email-verification', extra: {'email': email});
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) _showError(_authMessage(e.code));

@@ -116,7 +116,11 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     });
   }
 
+  bool _isAccepting = false;
+
   Future<void> _acceptJob(String bookingId) async {
+    if (_isAccepting) return;
+    setState(() => _isAccepting = true);
     try {
       final doc = await FirebaseFirestore.instance
           .collection('bookings')
@@ -146,6 +150,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
           backgroundColor: Colors.red,
         ));
       }
+    } finally {
+      if (mounted) setState(() => _isAccepting = false);
     }
   }
 
@@ -593,7 +599,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
               child: _buildQuickActionButton(
                 icon: Icons.history,
                 label: 'Job History',
-                onTap: () => context.push('/provider-job-history'),
+                onTap: () => context.push('/provider-job-requests'),
               ),
             ),
           ],
@@ -762,7 +768,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => _acceptJob(bookingId),
+                  onPressed: _isAccepting ? null : () => _acceptJob(bookingId),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
                     foregroundColor: Colors.white,

@@ -10,11 +10,11 @@ import '../../presentation/screens/provider/splash/splash_screen.dart';
 import '../../presentation/screens/provider/auth/provider_login_screen.dart';
 import '../../presentation/screens/provider/auth/provider_register_screen.dart';
 import '../../presentation/screens/provider/auth/provider_verification_screen.dart';
+import '../../presentation/screens/provider/auth/email_verification_screen.dart';
 import '../../presentation/screens/provider/dashboard/provider_dashboard_screen.dart';
 import '../../presentation/screens/provider/jobs/job_requests_screen.dart';
 import '../../presentation/screens/provider/jobs/active_jobs_screen.dart';
 import '../../presentation/screens/provider/jobs/job_detail_screen.dart';
-import '../../presentation/screens/provider/jobs/job_history_screen.dart';
 import '../../presentation/screens/provider/jobs/accept_job_screen.dart';
 import '../../presentation/screens/provider/schedule/provider_calendar_screen.dart';
 import '../../presentation/screens/provider/schedule/availability_settings_screen.dart';
@@ -31,6 +31,7 @@ const _publicRoutes = {
   '/provider-login',
   '/provider-register',
   '/provider-verification',
+  '/email-verification',
 };
 
 class AppRouter {
@@ -77,6 +78,16 @@ class AppRouter {
         path: '/provider-verification',
         name: 'provider-verification',
         builder: (context, state) => const ProviderVerificationScreen(),
+      ),
+      GoRoute(
+        path: '/email-verification',
+        name: 'email-verification',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return EmailVerificationScreen(
+            email: extra?['email']?.toString() ?? '',
+          );
+        },
       ),
       GoRoute(
         path: '/provider-onboarding',
@@ -128,11 +139,6 @@ class AppRouter {
           final data = state.extra as Map<String, dynamic>? ?? {};
           return CreateQuoteScreen(data: data);
         },
-      ),
-      GoRoute(
-        path: '/provider-job-history',
-        name: 'provider-job-history',
-        builder: (context, state) => const JobHistoryScreen(),
       ),
       GoRoute(
         path: '/provider-accept-job',
