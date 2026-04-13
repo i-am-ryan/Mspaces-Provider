@@ -150,10 +150,29 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   // ── Availability toggle ────────────────────────────────────────────────────
 
   Future<void> _toggleAvailability(bool current) async {
-    await _firestore
-        .collection('service_providers')
-        .doc(_uid)
-        .update({'isAvailable': !current});
+    final newValue = !current;
+    final Map<String, dynamic> update = {'isAvailable': newValue};
+
+    // When going available, stamp live location so clients can find us nearby
+    if (newValue) {
+      try {
+        LocationPermission perm = await Geolocator.checkPermission();
+        if (perm == LocationPermission.denied)
+          perm = await Geolocator.requestPermission();
+        if (perm != LocationPermission.denied &&
+            perm != LocationPermission.deniedForever) {
+          final pos = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.high);
+          update['liveLocation'] = {
+            'latitude': pos.latitude,
+            'longitude': pos.longitude,
+            'updatedAt': FieldValue.serverTimestamp(),
+          };
+        }
+      } catch (_) {}
+    }
+
+    await _firestore.collection('service_providers').doc(_uid).update(update);
   }
 
   // ── Sign out ───────────────────────────────────────────────────────────────

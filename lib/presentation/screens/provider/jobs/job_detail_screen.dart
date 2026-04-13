@@ -166,6 +166,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       final position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
 
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+
+      // Write to booking (existing — for ETA tracking)
       await FirebaseFirestore.instance
           .collection('bookings')
           .doc(widget.bookingId)
@@ -176,6 +179,21 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           'updatedAt': FieldValue.serverTimestamp(),
         },
       });
+
+      // Also write to service_providers so client home screen
+      // can show this provider as nearby (4-hour freshness window)
+      if (uid != null) {
+        await FirebaseFirestore.instance
+            .collection('service_providers')
+            .doc(uid)
+            .update({
+          'liveLocation': {
+            'latitude': position.latitude,
+            'longitude': position.longitude,
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+        });
+      }
 
       // Check if within 5 minutes — notify client
       final bookingDoc = await FirebaseFirestore.instance

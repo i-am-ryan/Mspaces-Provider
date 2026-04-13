@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:geolocator/geolocator.dart';
 
 class AvailabilitySettingsScreen extends StatefulWidget {
   const AvailabilitySettingsScreen({Key? key}) : super(key: key);
@@ -126,6 +127,31 @@ class _AvailabilitySettingsScreenState
         },
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      // If marking as available, write live location so clients
+      // can see this provider as nearby (4-hour freshness window)
+      if (_isAvailable) {
+        try {
+          LocationPermission perm = await Geolocator.checkPermission();
+          if (perm == LocationPermission.denied)
+            perm = await Geolocator.requestPermission();
+          if (perm != LocationPermission.denied &&
+              perm != LocationPermission.deniedForever) {
+            final pos = await Geolocator.getCurrentPosition(
+                desiredAccuracy: LocationAccuracy.high);
+            await FirebaseFirestore.instance
+                .collection('service_providers')
+                .doc(_uid)
+                .update({
+              'liveLocation': {
+                'latitude': pos.latitude,
+                'longitude': pos.longitude,
+                'updatedAt': FieldValue.serverTimestamp(),
+              },
+            });
+          }
+        } catch (_) {}
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
