@@ -51,8 +51,6 @@ class _SplashScreenState extends State<SplashScreen>
                 .get();
             final data = userDoc.data() ?? {};
             onboardingDone = data['onboardingCompleted'] as bool? ?? false;
-            final address = data['address'] as Map?;
-            if (address?['latitude'] != null) onboardingDone = true;
           } catch (_) {}
         }
         if (!mounted) return;
