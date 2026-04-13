@@ -137,6 +137,7 @@ class _ProviderNotificationsScreenState
     final invoiceId = n['invoiceId']?.toString();
 
     switch (type) {
+      // Bookings
       case 'new_booking':
         context.push('/provider-job-requests', extra: {'tab': 0});
         break;
@@ -150,6 +151,20 @@ class _ProviderNotificationsScreenState
         }
         break;
 
+      // Quotes
+
+      case 'new_job_request':
+        context.push('/provider-job-requests', extra: {'tab': 0});
+        break;
+      case 'new_quote':
+      case 'quote_request':
+      case 'quote_accepted':
+      case 'quote_declined':
+        context.push('/provider-job-requests', extra: {'tab': 1});
+        break;
+
+      // Payments
+
       case 'payment_received':
         context.push('/provider-earnings');
         break;
@@ -162,16 +177,6 @@ class _ProviderNotificationsScreenState
         }
         break;
 
-      case 'new_job_request':
-        context.push('/provider-job-requests', extra: {'tab': 0});
-        break;
-      case 'new_quote':
-      case 'quote_request':
-      case 'quote_accepted':
-      case 'quote_declined':
-        context.push('/provider-job-requests', extra: {'tab': 1});
-        break;
-
       case 'deposit_invoice':
       case 'invoice':
         if (invoiceId != null) {
@@ -179,10 +184,6 @@ class _ProviderNotificationsScreenState
         } else {
           context.push('/provider-earnings');
         }
-        break;
-
-      case 'new_job_request':
-        context.push('/provider-job-requests');
         break;
 
       case 'payout_requested':
