@@ -1,12 +1,10 @@
-import 'package:cloud_functions/cloud_functions.dart';
+// lib/presentation/screens/provider/screens/dashboard/provider_dashboard_screen.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import '../../../widgets/common/offers_carousel.dart';
-import '../../../widgets/common/banner_notification_overlay.dart';
-import '../../../widgets/common/banking_details_banner.dart';
 
 class ProviderDashboardScreen extends StatefulWidget {
   const ProviderDashboardScreen({Key? key}) : super(key: key);
@@ -17,1057 +15,547 @@ class ProviderDashboardScreen extends StatefulWidget {
 }
 
 class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
-  int _selectedIndex = 0;
+  final _uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-  String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
+  // ── Profile ──────────────────────────────────────────────────────────────
+  String _displayName = '';
+  String _photoUrl = '';
+  double _rating = 0;
 
-  Stream<DocumentSnapshot> get _providerStream => FirebaseFirestore.instance
-      .collection('service_providers')
-      .doc(_uid)
-      .snapshots();
+  // ── Stats ────────────────────────────────────────────────────────────────
+  int _weekJobs = 0;
+  double _weekEarnings = 0;
+  int _pendingCount = 0;
+  int _completedWeek = 0;
 
-  Stream<QuerySnapshot> get _pendingStream => FirebaseFirestore.instance
-      .collection('bookings')
-      .where('providerId', isEqualTo: _uid)
-      .where('status',
-          whereIn: ['pending', 'pending_provider_confirmation']).snapshots();
+  bool _loading = true;
 
-  Stream<QuerySnapshot> get _pendingQuotesStream => FirebaseFirestore.instance
-      .collection('quote_requests')
-      .where('providerId', isEqualTo: _uid)
-      .where('status', isEqualTo: 'pending')
-      .snapshots();
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboard();
+  }
 
-  Stream<QuerySnapshot> get _activeStream => FirebaseFirestore.instance
+  Future<void> _loadDashboard() async {
+    if (_uid.isEmpty) return;
+    setState(() => _loading = true);
+    try {
+      // ── Profile ────────────────────────────────────────────────────────
+      final spSnap = await FirebaseFirestore.instance
+          .collection('service_providers')
+          .doc(_uid)
+          .get();
+      final spData = spSnap.data() ?? {};
+
+      final userSnap =
+          await FirebaseFirestore.instance.collection('users').doc(_uid).get();
+      final userData = userSnap.data() ?? {};
+
+      final name = spData['displayName']?.toString() ??
+          userData['displayName']?.toString() ??
+          FirebaseAuth.instance.currentUser?.displayName ??
+          '';
+      final photo = spData['profilePhotoUrl']?.toString() ?? '';
+      final ratingRaw = spData['averageRating'] ?? spData['rating'] ?? 0.0;
+      final rating = ratingRaw is num ? ratingRaw.toDouble() : 0.0;
+
+      // ── This week range ────────────────────────────────────────────────
+      final now = DateTime.now();
+      final weekStart = now.subtract(Duration(days: now.weekday - 1));
+      final weekStartTs = Timestamp.fromDate(
+          DateTime(weekStart.year, weekStart.month, weekStart.day));
+
+      // ── This week's active jobs — no date filter to avoid index issues ─
+      // We fetch all active and filter client-side by scheduledDate
+      final activeSnap = await FirebaseFirestore.instance
           .collection('bookings')
           .where('providerId', isEqualTo: _uid)
           .where('status', whereIn: [
-        'accepted',
         'confirmed',
+        'provider_en_route',
+        'provider_arrived',
         'in_progress',
-        'assessment_complete'
-      ]).snapshots();
+        'accepted',
+      ]).get();
 
-  Stream<QuerySnapshot> get _earningsStream => FirebaseFirestore.instance
-      .collection('transactions')
-      .doc(_uid)
-      .collection('entries')
-      .where('status', isEqualTo: 'completed')
-      .snapshots();
-
-  List<QueryDocumentSnapshot> _weekJobs(List<QueryDocumentSnapshot> docs) {
-    final now = DateTime.now();
-    final monday = now.subtract(Duration(days: now.weekday - 1));
-    final start = DateTime(monday.year, monday.month, monday.day);
-    final end = start.add(const Duration(days: 7));
-    return docs.where((doc) {
-      final ts = (doc.data() as Map)['scheduledDate'];
-      if (ts is! Timestamp) return false;
-      final d = ts.toDate();
-      return d.isAfter(start) && d.isBefore(end);
-    }).toList();
-  }
-
-  double _weekEarnings(List<QueryDocumentSnapshot> docs) {
-    final now = DateTime.now();
-    final monday = now.subtract(Duration(days: now.weekday - 1));
-    final weekStart = DateTime(monday.year, monday.month, monday.day);
-    double total = 0;
-    for (final doc in docs) {
-      final d = doc.data() as Map;
-      final ts = d['completedAt'];
-      if (ts is! Timestamp) continue;
-      if (ts.toDate().isBefore(weekStart)) continue;
-      final v = d['amount'];
-      if (v != null) {
-        total += (v is num) ? v.toDouble() : double.tryParse(v.toString()) ?? 0;
+      // Filter this week client-side
+      int weekJobs = 0;
+      for (final doc in activeSnap.docs) {
+        final data = doc.data();
+        final scheduled = _toDateTime(data['scheduledDate']);
+        if (scheduled != null && !scheduled.isBefore(weekStartTs.toDate())) {
+          weekJobs++;
+        } else if (scheduled == null) {
+          // If no scheduled date, count it (it's active now)
+          weekJobs++;
+        }
       }
-    }
-    return total;
-  }
 
-  void _onBottomNavTap(int index) {
-    setState(() => _selectedIndex = index);
-    switch (index) {
-      case 0:
-        break;
-      case 1:
-        context.push('/provider-job-requests');
-        break;
-      case 2:
-        context.push('/provider-calendar');
-        break;
-      case 3:
-        context.push('/provider-earnings');
-        break;
-      case 4:
-        context.push('/provider-profile');
-        break;
-    }
-  }
-
-  Future<void> _toggleAvailability(bool current) async {
-    await FirebaseFirestore.instance
-        .collection('service_providers')
-        .doc(_uid)
-        .update({
-      'isAvailable': !current,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-  }
-
-  bool _isAccepting = false;
-
-  Future<void> _acceptJob(String bookingId) async {
-    if (_isAccepting) return;
-    setState(() => _isAccepting = true);
-    try {
-      final doc = await FirebaseFirestore.instance
+      // ── Completed this week ────────────────────────────────────────────
+      final completedSnap = await FirebaseFirestore.instance
           .collection('bookings')
-          .doc(bookingId)
+          .where('providerId', isEqualTo: _uid)
+          .where('status', isEqualTo: 'completed')
           .get();
-      final status = (doc.data() as Map?)?['status']?.toString() ?? '';
 
-      if (status == 'pending_provider_confirmation') {
-        await FirebaseFirestore.instance
-            .collection('bookings')
-            .doc(bookingId)
-            .update({
-          'status': 'confirmed',
-          'returnVisitConfirmedAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      } else {
-        final callable = FirebaseFunctions.instanceFor(region: 'europe-west4')
-            .httpsCallable('confirmBooking');
-        await callable.call({'bookingId': bookingId});
+      int completedWeek = 0;
+      double weekEarnings = 0;
+      for (final doc in completedSnap.docs) {
+        final data = doc.data();
+        // Check completedAt or updatedAt or scheduledDate
+        final completedAt = _toDateTime(data['completedAt']) ??
+            _toDateTime(data['updatedAt']) ??
+            _toDateTime(data['scheduledDate']);
+        if (completedAt != null &&
+            !completedAt.isBefore(weekStartTs.toDate())) {
+          completedWeek++;
+          final amt =
+              data['totalAmount'] ?? data['amount'] ?? data['callOutFee'] ?? 0;
+          weekEarnings += (amt as num).toDouble();
+        }
       }
-      if (mounted) context.push('/provider-job-detail', extra: bookingId);
-    } catch (e) {
+
+      // ── Pending bookings ───────────────────────────────────────────────
+      final pendingSnap = await FirebaseFirestore.instance
+          .collection('bookings')
+          .where('providerId', isEqualTo: _uid)
+          .where('status',
+              whereIn: ['pending', 'pending_provider_confirmation']).get();
+
+      // ── Pending quotes ─────────────────────────────────────────────────
+      int quoteCount = 0;
+      try {
+        final quoteSnap = await FirebaseFirestore.instance
+            .collection('quote_requests')
+            .where('providerId', isEqualTo: _uid)
+            .where('status', isEqualTo: 'pending')
+            .get();
+        quoteCount = quoteSnap.docs.length;
+      } catch (_) {}
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Failed to confirm: $e'),
-          backgroundColor: Colors.red,
-        ));
+        setState(() {
+          _displayName = name;
+          _photoUrl = photo;
+          _rating = rating;
+          _weekJobs = weekJobs;
+          _completedWeek = completedWeek;
+          _pendingCount = pendingSnap.docs.length + quoteCount;
+          _weekEarnings = weekEarnings;
+          _loading = false;
+        });
       }
-    } finally {
-      if (mounted) setState(() => _isAccepting = false);
+    } catch (e) {
+      debugPrint('Dashboard load error: $e');
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _declineJob(String bookingId) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('bookings')
-          .doc(bookingId)
-          .update({
-        'status': 'declined',
-        'declineReason': 'Not available',
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    } catch (_) {}
+  DateTime? _toDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is String && value.isNotEmpty) {
+      try {
+        return DateTime.parse(value);
+      } catch (_) {}
+    }
+    return null;
   }
+
+  String get _greeting {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  String get _firstName {
+    final first = _displayName.trim().split(' ').first;
+    return first.isNotEmpty ? first : 'Provider';
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<DocumentSnapshot>(
-      stream: _providerStream,
-      builder: (context, provSnap) {
-        final provider = provSnap.data?.data() as Map<String, dynamic>? ?? {};
-        final displayName = provider['displayName'] as String? ??
-            FirebaseAuth.instance.currentUser?.displayName ??
-            'Provider';
-        final isAvailable = provider['isAvailable'] as bool? ?? true;
-
-        return StreamBuilder<QuerySnapshot>(
-          stream: _pendingStream,
-          builder: (context, pendingSnap) {
-            return StreamBuilder<QuerySnapshot>(
-              stream: _pendingQuotesStream,
-              builder: (context, quotesSnap) {
-                final pendingDocs = List<QueryDocumentSnapshot>.from(
-                    pendingSnap.data?.docs ?? []);
-                final pendingQuoteDocs = List<QueryDocumentSnapshot>.from(
-                    quotesSnap.data?.docs ?? []);
-                final allPendingCount =
-                    pendingDocs.length + pendingQuoteDocs.length;
-
-                return StreamBuilder<QuerySnapshot>(
-                  stream: _activeStream,
-                  builder: (context, activeSnap) {
-                    final activeDocs = List<QueryDocumentSnapshot>.from(
-                        activeSnap.data?.docs ?? []);
-                    final weekDocs = _weekJobs(activeDocs).where((doc) {
-                      final status =
-                          (doc.data() as Map)['status']?.toString() ?? '';
-                      return status == 'confirmed' || status == 'accepted';
-                    }).toList()
-                      ..sort((a, b) {
-                        final aTs = ((a.data() as Map)['scheduledDate']);
-                        final bTs = ((b.data() as Map)['scheduledDate']);
-                        if (aTs is Timestamp && bTs is Timestamp)
-                          return aTs.compareTo(bTs);
-                        return 0;
-                      });
-
-                    return StreamBuilder<QuerySnapshot>(
-                      stream: _earningsStream,
-                      builder: (context, earningsSnap) {
-                        final earningsDocs = List<QueryDocumentSnapshot>.from(
-                            earningsSnap.data?.docs ?? []);
-                        final weekTotal = _weekEarnings(earningsDocs);
-
-                        return BannerNotificationOverlay(
-                          child: Scaffold(
-                            backgroundColor: Colors.white,
-                            body: SafeArea(
-                              child: Column(
-                                children: [
-                                  _buildTopBar(displayName, isAvailable),
-                                  BankingDetailsBanner(
-                                      route: '/provider-payout-settings'),
-                                  Expanded(
-                                    child: SingleChildScrollView(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          _buildHeroBanner(
-                                              displayName, isAvailable),
-                                          Padding(
-                                            padding: const EdgeInsets.all(20),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                _buildStatsCards(
-                                                  todayCount: weekDocs.length,
-                                                  weekEarnings: weekTotal,
-                                                  pendingCount: allPendingCount,
-                                                ),
-                                                const SizedBox(height: 24),
-                                                _buildQuickActions(),
-                                                const SizedBox(height: 24),
-                                                _buildPendingSection(
-                                                    pendingDocs,
-                                                    pendingQuoteDocs),
-                                                const SizedBox(height: 24),
-                                                _buildTodayScheduleSection(
-                                                    weekDocs),
-                                                const SizedBox(height: 24),
-                                                const OffersCarousel(
-                                                    targetType: 'providers'),
-                                                const SizedBox(height: 80),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(height: 80),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            bottomNavigationBar: _buildBottomNav(),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildTopBar(String displayName, bool isAvailable) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: Colors.grey[300],
-                child:
-                    const Icon(Icons.person, size: 24, color: Colors.black54),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Welcome back,',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-                  Text(displayName,
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => _toggleAvailability(isAvailable),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isAvailable ? Colors.green : Colors.grey[400],
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      body: SafeArea(
+        child: _loading
+            ? const Center(
+                child: CircularProgressIndicator(color: Colors.black))
+            : RefreshIndicator(
+                onRefresh: _loadDashboard,
+                color: Colors.black,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
+                      // ── Hero banner ───────────────────────────────────
+                      _buildHeroBanner(),
+                      Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildStatsGrid(),
+                            const SizedBox(height: 24),
+                            _buildQuickActions(),
+                            const SizedBox(height: 24),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        isAvailable ? 'Online' : 'Offline',
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600),
-                      ),
+                      // ── Offers ────────────────────────────────────────
+                      const OffersCarousel(targetType: 'providers'),
+                      const SizedBox(height: 80),
                     ],
                   ),
                 ),
               ),
-              IconButton(
-                onPressed: () => context.push('/provider-notifications'),
-                icon: StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(FirebaseAuth.instance.currentUser?.uid)
-                      .collection('notifications')
-                      .where('read', isEqualTo: false)
-                      .snapshots(),
-                  builder: (context, snap) {
-                    final count = snap.data?.docs.length ?? 0;
-                    return Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        const Icon(Icons.notifications_outlined, size: 24),
-                        if (count > 0)
-                          Positioned(
-                            top: -4,
-                            right: -4,
-                            child: Container(
-                              padding: const EdgeInsets.all(3),
-                              decoration: const BoxDecoration(
-                                  color: Colors.red, shape: BoxShape.circle),
-                              child: Text(
-                                count > 99 ? '99+' : '$count',
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
 
-  Widget _buildHeroBanner(String displayName, bool isAvailable) {
-    return SizedBox(
+  // ── Hero Banner ───────────────────────────────────────────────────────────
+
+  Widget _buildHeroBanner() {
+    final initials = _displayName
+        .trim()
+        .split(' ')
+        .where((w) => w.isNotEmpty)
+        .take(2)
+        .map((w) => w[0].toUpperCase())
+        .join();
+
+    return Container(
       height: 160,
-      child: Stack(
-        children: [
-          ClipPath(
-            clipper: HeroBannerClipper(),
-            child: SizedBox(
-              width: double.infinity,
-              height: double.infinity,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Background image
-                  Image.asset(
-                    'assets/images/james-kovin-YQGPSblLPz0-unsplash.jpg',
-                    fit: BoxFit.cover,
-                    errorBuilder: (ctx, e, s) =>
-                        Container(color: Colors.grey[800]),
+      decoration: BoxDecoration(
+        image: const DecorationImage(
+          image: AssetImage(
+              'assets/images/benjamin-brunner-imEtY2Kpejk-unsplash.jpg'),
+          fit: BoxFit.cover,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black.withValues(alpha: 0.55),
+              Colors.black.withValues(alpha: 0.70),
+            ],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Row(
+            children: [
+              // Profile picture
+              GestureDetector(
+                onTap: () => context.push('/provider-profile'),
+                child: Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
                   ),
-                  // Dark overlay (55% opacity)
-                  const ColoredBox(color: Color(0x8C000000)),
-                  // Subtle bottom gradient
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Color(0x4D000000)],
+                  child: ClipOval(
+                    child: _photoUrl.isNotEmpty
+                        ? Image.network(_photoUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                _initialsWidget(initials))
+                        : _initialsWidget(initials),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              // Greeting
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '$_greeting, $_firstName! 👋',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _rating > 0
+                          ? '⭐ ${_rating.toStringAsFixed(1)} · Ready for new jobs'
+                          : 'Ready to take on new jobs',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Notifications
+              Stack(children: [
+                IconButton(
+                  onPressed: () => context.push('/provider-notifications'),
+                  icon: const Icon(Icons.notifications_outlined,
+                      color: Colors.white, size: 26),
+                ),
+                // Unread badge
+                if (_pendingCount > 0)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
+              ]),
+            ],
           ),
-          Positioned(
-            left: 20,
-            top: 30,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  displayName,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    shadows: [Shadow(color: Color(0x80000000), blurRadius: 10)],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isAvailable ? Colors.green : Colors.grey,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isAvailable ? Icons.check_circle : Icons.pause_circle,
-                        size: 14,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        isAvailable ? 'Available' : 'Unavailable',
-                        style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildStatsCards({
-    required int todayCount,
-    required double weekEarnings,
-    required int pendingCount,
-  }) {
+  Widget _initialsWidget(String initials) {
+    return Container(
+      color: Colors.grey[800],
+      child: Center(
+        child: Text(
+          initials.isNotEmpty ? initials : '?',
+          style: const TextStyle(
+              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+      ),
+    );
+  }
+
+  // ── Stats Grid ────────────────────────────────────────────────────────────
+
+  Widget _buildStatsGrid() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                title: "Today's Jobs",
-                value: '$todayCount',
-                icon: Icons.work_outline,
-                color: Colors.blue,
-              ),
+        const Text('This Week',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(
+            child: _statCard(
+              label: "This Week's Jobs",
+              value: _weekJobs.toString(),
+              icon: Icons.work_outline,
+              color: Colors.blue,
+              // tab 0 = active/requests
+              onTap: () =>
+                  context.push('/provider-job-requests', extra: {'tab': 0}),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
-                title: 'Week Earnings',
-                value: 'R${weekEarnings.toStringAsFixed(0)}',
-                icon: Icons.account_balance_wallet_outlined,
-                color: Colors.green,
-              ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _statCard(
+              label: "Week's Earnings",
+              value: _weekEarnings > 0
+                  ? 'R${_weekEarnings.toStringAsFixed(0)}'
+                  : 'R0',
+              icon: Icons.account_balance_wallet_outlined,
+              color: Colors.green,
+              onTap: () => context.push('/provider-earnings'),
             ),
-          ],
-        ),
+          ),
+        ]),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                title: 'Pending',
-                value: '$pendingCount',
-                icon: Icons.pending_actions,
-                color: Colors.orange,
-              ),
+        Row(children: [
+          Expanded(
+            child: _statCard(
+              label: 'Pending Requests\nThis Week',
+              value: _pendingCount.toString(),
+              icon: Icons.pending_outlined,
+              color: Colors.orange,
+              // tab 0 = requests/pending
+              onTap: () =>
+                  context.push('/provider-job-requests', extra: {'tab': 0}),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
-                title: 'Active Jobs',
-                value: '$todayCount',
-                icon: Icons.trending_up,
-                color: Colors.purple,
-              ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _statCard(
+              label: 'Completed\nThis Week',
+              value: _completedWeek.toString(),
+              icon: Icons.check_circle_outline,
+              color: Colors.purple,
+              // tab 2 = past
+              onTap: () =>
+                  context.push('/provider-job-requests', extra: {'tab': 2}),
             ),
-          ],
-        ),
+          ),
+        ]),
       ],
     );
   }
 
-  Widget _buildStatCard({
-    required String title,
+  Widget _statCard({
+    required String label,
     required String value,
     required IconData icon,
     required Color color,
+    required VoidCallback onTap,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0x1A000000)),
-        boxShadow: const [
-          BoxShadow(
-              color: Color(0x0D000000), blurRadius: 10, offset: Offset(0, 4))
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2))
+          ],
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, size: 20, color: color),
+            child: Icon(icon, color: color, size: 20),
           ),
           const SizedBox(height: 12),
           Text(value,
-              style:
-                  const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              style: TextStyle(
+                  fontSize: 22, fontWeight: FontWeight.bold, color: color)),
           const SizedBox(height: 4),
-          Text(title, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-        ],
+          Text(label,
+              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Icon(Icons.arrow_forward_ios,
+                size: 10, color: Colors.grey[400]),
+          ),
+        ]),
       ),
     );
   }
+
+  // ── Quick Actions ─────────────────────────────────────────────────────────
 
   Widget _buildQuickActions() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('Quick Actions',
-            style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black)),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _buildQuickActionButton(
-                icon: Icons.add_circle_outline,
-                label: 'Add Service',
-                onTap: () => context.push('/provider-add-service'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildQuickActionButton(
-                icon: Icons.calendar_today,
-                label: 'Availability',
-                onTap: () => context.push('/provider-availability'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildQuickActionButton(
-                icon: Icons.history,
-                label: 'Job History',
-                onTap: () =>
-                    context.push('/provider-job-requests', extra: {'tab': 2}),
-              ),
-            ),
-          ],
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 14),
+        _actionTile(
+          icon: Icons.notifications_active_outlined,
+          color: Colors.orange,
+          title: 'Job Requests',
+          subtitle: _pendingCount > 0
+              ? '$_pendingCount pending request${_pendingCount == 1 ? '' : 's'}'
+              : 'No pending requests',
+          onTap: () =>
+              context.push('/provider-job-requests', extra: {'tab': 0}),
+        ),
+        _actionTile(
+          icon: Icons.account_balance_wallet_outlined,
+          color: Colors.green,
+          title: 'Earnings & Payments',
+          subtitle: _weekEarnings > 0
+              ? 'R${_weekEarnings.toStringAsFixed(0)} this week'
+              : 'View your earnings history',
+          onTap: () => context.push('/provider-earnings'),
+        ),
+        _actionTile(
+          icon: Icons.history,
+          color: Colors.purple,
+          title: 'Job History',
+          subtitle: '$_completedWeek completed this week',
+          // tab 2 = past jobs
+          onTap: () =>
+              context.push('/provider-job-requests', extra: {'tab': 2}),
+        ),
+        _actionTile(
+          icon: Icons.person_outline,
+          color: Colors.blue,
+          title: 'My Profile',
+          subtitle: 'Edit your profile and services',
+          onTap: () => context.push('/provider-profile'),
         ),
       ],
     );
   }
 
-  Widget _buildQuickActionButton({
+  Widget _actionTile({
     required IconData icon,
-    required String label,
+    required Color color,
+    required String title,
+    required String subtitle,
     required VoidCallback onTap,
   }) {
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, size: 24, color: Colors.black),
-            const SizedBox(height: 8),
-            Text(label,
-                style:
-                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPendingSection(List<QueryDocumentSnapshot> pendingDocs,
-      List<QueryDocumentSnapshot> pendingQuoteDocs) {
-    if (pendingDocs.isEmpty && pendingQuoteDocs.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-                'Pending Requests (${pendingDocs.length + pendingQuoteDocs.length})',
-                style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black)),
-            TextButton(
-              onPressed: () => context.push('/provider-job-requests'),
-              child: const Text('See All',
-                  style: TextStyle(
-                      color: Colors.black, fontWeight: FontWeight.w600)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        ...pendingDocs.take(2).map((doc) => _buildRequestCard(doc)),
-        ...pendingQuoteDocs.take(2).map((doc) => _buildQuoteRequestCard(doc)),
-      ],
-    );
-  }
-
-  Widget _buildRequestCard(QueryDocumentSnapshot doc) {
-    final d = doc.data() as Map<String, dynamic>;
-    final bookingId = doc.id;
-    final clientName = d['clientName'] as String? ?? 'Unknown';
-    final service = d['serviceCategory'] ?? d['service'] ?? 'Service';
-    final scheduledTime = d['scheduledTime'] as String? ?? '—';
-    final address = d['address'] ?? d['location'] ?? '—';
-    final v = d['estimatedPrice'] ?? d['amount'];
-    final amountStr = v != null
-        ? 'R${((v is num) ? v.toDouble() : double.tryParse(v.toString()) ?? 0).toStringAsFixed(0)}'
-        : 'TBD';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0x1A000000)),
-        boxShadow: const [
-          BoxShadow(
-              color: Color(0x0D000000), blurRadius: 10, offset: Offset(0, 4))
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: Colors.grey[200],
-                child:
-                    const Icon(Icons.person, size: 20, color: Colors.black54),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(clientName,
-                        style: const TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.bold)),
-                    Text(service.toString(),
-                        style:
-                            TextStyle(fontSize: 13, color: Colors.grey[600])),
-                  ],
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.green[50],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(amountStr,
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green[700])),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
-              const SizedBox(width: 4),
-              Text(scheduledTime,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-              const SizedBox(width: 12),
-              Icon(Icons.location_on, size: 14, color: Colors.grey[600]),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(address.toString(),
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    overflow: TextOverflow.ellipsis),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _declineJob(bookingId),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.black,
-                    side: const BorderSide(color: Colors.black),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                  child: const Text('Decline',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: _isAccepting ? null : () => _acceptJob(bookingId),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                  child: const Text('Accept',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuoteRequestCard(QueryDocumentSnapshot doc) {
-    final d = doc.data() as Map<String, dynamic>;
-    final clientName = d['clientName']?.toString() ?? 'Client';
-    final category = d['category']?.toString() ?? 'Service';
-    final address = d['address']?.toString() ?? '';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.purple.shade200, width: 1.5),
-        boxShadow: const [
-          BoxShadow(
-              color: Color(0x0D000000), blurRadius: 8, offset: Offset(0, 2))
-        ],
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: Colors.purple.shade50,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text('Quote Request',
-                style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.purple.shade700,
-                    fontWeight: FontWeight.w600)),
-          ),
-          const Spacer(),
-          Icon(Icons.chevron_right, color: Colors.grey[400], size: 18),
-        ]),
-        const SizedBox(height: 8),
-        Text(category,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(clientName,
-            style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-        if (address.isNotEmpty) ...[
-          const SizedBox(height: 2),
-          Text(address,
-              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis),
-        ],
-        const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () => context.push('/provider-quote-detail/${doc.id}'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.purple.shade700,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('View & Quote',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-          ),
-        ),
-      ]),
-    );
-  }
-
-  Widget _buildTodayScheduleSection(List<QueryDocumentSnapshot> todayDocs) {
-    final visible = todayDocs.take(5).toList();
-    final hasMore = todayDocs.length > 5;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-                "This Week's Schedule${todayDocs.isNotEmpty ? ' (${todayDocs.length})' : ''}",
-                style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black)),
-            TextButton(
-              onPressed: () => context.push('/provider-calendar'),
-              child: const Text('View Calendar',
-                  style: TextStyle(
-                      color: Colors.black, fontWeight: FontWeight.w600)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (todayDocs.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Center(
-              child: Column(
-                children: [
-                  Icon(Icons.event_available,
-                      size: 48, color: Colors.grey[400]),
-                  const SizedBox(height: 12),
-                  Text('No confirmed jobs this week',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600])),
-                ],
-              ),
-            ),
-          )
-        else ...[
-          ...visible.map((doc) => _buildScheduleCard(doc)),
-          if (hasMore)
-            GestureDetector(
-              onTap: () => context.push('/provider-calendar'),
-              child: Container(
-                margin: const EdgeInsets.only(top: 4),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'See all ${todayDocs.length} jobs this week',
-                        style: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.chevron_right, size: 18),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildScheduleCard(QueryDocumentSnapshot doc) {
-    final d = doc.data() as Map<String, dynamic>;
-    final service = d['serviceCategory'] ?? d['service'] ?? 'Service';
-    final clientName = d['clientName'] as String? ?? '—';
-    final address = d['address'] ?? d['location'] ?? '—';
-    final scheduledTime = d['scheduledTime'] as String? ?? '—';
-    final bookingId = doc.id;
-
-    return GestureDetector(
-      onTap: () => context.push('/provider-job-detail', extra: bookingId),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.black,
-          borderRadius: BorderRadius.circular(16),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
           boxShadow: const [
             BoxShadow(
-                color: Color(0x1A000000), blurRadius: 10, offset: Offset(0, 4))
+                color: Color(0x0A000000), blurRadius: 6, offset: Offset(0, 2))
           ],
         ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.schedule, size: 24, color: Colors.black),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(service.toString(),
-                      style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white)),
-                  const SizedBox(height: 4),
-                  Text(
-                    '$clientName • ${address.toString()}',
-                    style: const TextStyle(fontSize: 13, color: Colors.white70),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(scheduledTime,
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title,
                   style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black)),
-            ),
-          ],
-        ),
+                      fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 2),
+              Text(subtitle,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+            ]),
+          ),
+          Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey[400]),
+        ]),
       ),
     );
   }
-
-  Widget _buildBottomNav() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.black,
-        boxShadow: [
-          BoxShadow(
-              color: Color(0x1A000000), blurRadius: 10, offset: Offset(0, -4))
-        ],
-      ),
-      child: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onBottomNavTap,
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.black,
-        selectedItemColor: Colors.white,
-        unselectedItemColor: const Color(0x99FFFFFF),
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-        elevation: 0,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_outlined),
-            activeIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.assignment_outlined),
-            activeIcon: Icon(Icons.assignment),
-            label: 'Requests',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today_outlined),
-            activeIcon: Icon(Icons.calendar_today),
-            label: 'Calendar',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            activeIcon: Icon(Icons.account_balance_wallet),
-            label: 'Earnings',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class HeroBannerClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    var path = Path();
-    path.lineTo(0, size.height - 40);
-    var fcp = Offset(size.width / 4, size.height - 10);
-    var fep = Offset(size.width / 2, size.height - 30);
-    path.quadraticBezierTo(fcp.dx, fcp.dy, fep.dx, fep.dy);
-    var scp = Offset(size.width * 3 / 4, size.height - 50);
-    var sep = Offset(size.width, size.height - 30);
-    path.quadraticBezierTo(scp.dx, scp.dy, sep.dx, sep.dy);
-    path.lineTo(size.width, 0);
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }
