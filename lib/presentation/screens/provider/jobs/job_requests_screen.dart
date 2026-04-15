@@ -199,18 +199,36 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
   void _showQuoteSheet(String quoteRequestId, Map<String, dynamic> data) {
     final clientName = data['clientName']?.toString() ?? 'Client';
     final category = data['category']?.toString() ?? 'Service';
+
     final List<Map<String, TextEditingController>> lineItems = [
       {
-        'desc': TextEditingController(text: category),
-        'amount': TextEditingController()
+        'desc': TextEditingController(),
+        'qty': TextEditingController(),
+        'rate': TextEditingController(),
+      },
+      {
+        'desc': TextEditingController(text: 'Labour'),
+        'qty': TextEditingController(),
+        'rate': TextEditingController(),
       },
     ];
+    if (category.isNotEmpty) lineItems[0]['desc']!.text = category;
+
     final notesCtrl = TextEditingController();
     final validDaysCtrl = TextEditingController(text: '7');
     bool isSending = false;
     bool includeVat = false;
+    bool includeDiscount = false;
+    double discountPercent = 5;
     bool requireDeposit = false;
     double depositPercent = 50;
+    String errorMessage = '';
+
+    double lineAmount(Map<String, TextEditingController> item) {
+      final qty = double.tryParse(item['qty']!.text) ?? 0;
+      final rate = double.tryParse(item['rate']!.text) ?? 0;
+      return qty * rate;
+    }
 
     showModalBottomSheet(
       context: context,
@@ -219,376 +237,684 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Padding(
-          padding: EdgeInsets.fromLTRB(
-              20,
-              20,
-              20,
-              MediaQuery.of(ctx).viewInsets.bottom +
-                  MediaQuery.of(ctx).padding.bottom +
-                  20),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(2))),
-                ),
-                Row(children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(10)),
-                    child: const Icon(Icons.request_quote_outlined,
-                        color: Colors.white, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Send Quote',
-                              style: TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.bold)),
-                          Text('To $clientName · $category',
-                              style: TextStyle(
-                                  fontSize: 12, color: Colors.grey[600])),
-                        ]),
-                  ),
-                ]),
-                const SizedBox(height: 20),
-                const Text('Line Items',
-                    style:
-                        TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                StatefulBuilder(
-                  builder: (ctx2, setItems) => Column(children: [
-                    ...lineItems.asMap().entries.map((e) {
-                      final i = e.key;
-                      final item = e.value;
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(12),
+        builder: (ctx, setSheet) {
+          double subtotal =
+              lineItems.fold(0, (sum, item) => sum + lineAmount(item));
+          double discountAmount =
+              includeDiscount ? subtotal * discountPercent / 100 : 0;
+          double afterDiscount = subtotal - discountAmount;
+          double vatAmount = includeVat ? afterDiscount * 0.15 : 0;
+          double total = afterDiscount + vatAmount;
+          double depositAmount =
+              requireDeposit ? total * depositPercent / 100 : 0;
+
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+                20,
+                20,
+                20,
+                MediaQuery.of(ctx).viewInsets.bottom +
+                    MediaQuery.of(ctx).padding.bottom +
+                    20),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Handle
+                  Center(
+                    child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 16),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.grey.shade200),
-                        ),
-                        child: Row(children: [
-                          Expanded(
-                            flex: 3,
-                            child: TextField(
-                              controller: item['desc'],
-                              decoration: InputDecoration(
-                                hintText: 'Description',
-                                hintStyle: TextStyle(
-                                    fontSize: 12, color: Colors.grey[400]),
-                                border: InputBorder.none,
-                                isDense: true,
-                              ),
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          SizedBox(
-                            width: 90,
-                            child: TextField(
-                              controller: item['amount'],
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                      decimal: true),
-                              decoration: InputDecoration(
-                                hintText: 'R 0.00',
-                                hintStyle: TextStyle(
-                                    fontSize: 12, color: Colors.grey[400]),
-                                border: InputBorder.none,
-                                isDense: true,
-                              ),
-                              style: const TextStyle(fontSize: 13),
-                              textAlign: TextAlign.right,
-                            ),
-                          ),
-                          if (lineItems.length > 1)
-                            GestureDetector(
-                              onTap: () =>
-                                  setItems(() => lineItems.removeAt(i)),
-                              child: Padding(
-                                padding: const EdgeInsets.only(left: 8),
-                                child: Icon(Icons.remove_circle,
-                                    color: Colors.red[400], size: 18),
-                              ),
-                            ),
-                        ]),
-                      );
-                    }),
-                    const SizedBox(height: 4),
-                    GestureDetector(
-                      onTap: () => setItems(() => lineItems.add({
-                            'desc': TextEditingController(),
-                            'amount': TextEditingController(),
-                          })),
-                      child: Row(children: [
-                        Icon(Icons.add_circle_outline,
-                            size: 18, color: Colors.grey[600]),
-                        const SizedBox(width: 6),
-                        Text('Add line item',
-                            style: TextStyle(
-                                fontSize: 13, color: Colors.grey[600])),
-                      ]),
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2))),
+                  ),
+                  // Header
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                          color: Colors.black,
+                          borderRadius: BorderRadius.circular(10)),
+                      child: const Icon(Icons.request_quote_outlined,
+                          color: Colors.white, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Send Quote',
+                                style: TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.bold)),
+                            Text('To $clientName · $category',
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.grey[600])),
+                          ]),
                     ),
                   ]),
-                ),
-                const SizedBox(height: 16),
-                // VAT + Deposit options
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade200),
+                  const SizedBox(height: 20),
+
+                  // Line items header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Line Items',
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w600)),
+                      TextButton.icon(
+                        onPressed: () => setSheet(
+                            () => lineItems.insert(lineItems.length - 1, {
+                                  'desc': TextEditingController(),
+                                  'qty': TextEditingController(),
+                                  'rate': TextEditingController(),
+                                })),
+                        icon: const Icon(Icons.add,
+                            size: 16, color: Colors.black),
+                        label: const Text('Add',
+                            style: TextStyle(color: Colors.black)),
+                      ),
+                    ],
                   ),
-                  child: Column(children: [
-                    Row(children: [
-                      Checkbox(
-                        value: includeVat,
-                        onChanged: (v) =>
-                            setSheet(() => includeVat = v ?? false),
-                        activeColor: Colors.black,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Include VAT (15%)',
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600)),
-                              Text(
-                                includeVat
-                                    ? 'VAT will be added to the total'
-                                    : 'Add 15% VAT to subtotal',
-                                style: TextStyle(
-                                    fontSize: 11, color: Colors.grey[600]),
-                              ),
-                            ]),
-                      ),
+                  const SizedBox(height: 4),
+
+                  // Table header
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(10)),
+                    ),
+                    child: Row(children: [
+                      const Expanded(
+                          flex: 4,
+                          child: Text('Description',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold))),
+                      SizedBox(
+                          width: 36,
+                          child: const Text('Qty',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center)),
+                      SizedBox(
+                          width: 70,
+                          child: const Text('Rate',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.right)),
+                      SizedBox(
+                          width: 70,
+                          child: const Text('Amount',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.right)),
+                      const SizedBox(width: 20),
                     ]),
-                    Divider(height: 1, color: Colors.grey.shade200),
-                    Row(children: [
-                      Checkbox(
-                        value: requireDeposit,
-                        onChanged: (v) =>
-                            setSheet(() => requireDeposit = v ?? false),
-                        activeColor: Colors.black,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+
+                  // Line items
+                  ...lineItems.asMap().entries.map((e) {
+                    final i = e.key;
+                    final item = e.value;
+                    final isLabour = item['desc']!.text == 'Labour';
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 1),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isLabour
+                            ? Colors.blue.shade50
+                            : Colors.grey.shade50,
+                        border: Border.all(color: Colors.grey.shade200),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Require Deposit',
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600)),
-                              Text(
-                                requireDeposit
-                                    ? '${depositPercent.toInt()}% payable upfront'
-                                    : 'Request upfront deposit',
-                                style: TextStyle(
-                                    fontSize: 11, color: Colors.grey[600]),
-                              ),
-                            ]),
-                      ),
-                      if (requireDeposit)
-                        DropdownButton<double>(
-                          value: depositPercent,
-                          isDense: true,
-                          underline: const SizedBox(),
-                          items: [25.0, 30.0, 50.0, 60.0, 70.0]
-                              .map((p) => DropdownMenuItem(
-                                  value: p,
-                                  child: Text('${p.toInt()}%',
-                                      style: const TextStyle(fontSize: 13))))
-                              .toList(),
-                          onChanged: (v) =>
-                              setSheet(() => depositPercent = v ?? 50),
+                      child: Row(children: [
+                        Expanded(
+                          flex: 4,
+                          child: TextField(
+                            controller: item['desc'],
+                            readOnly: isLabour,
+                            onChanged: (_) => setSheet(() {}),
+                            decoration: InputDecoration(
+                              hintText: 'Description',
+                              hintStyle: TextStyle(
+                                  fontSize: 11, color: Colors.grey[400]),
+                              border: InputBorder.none,
+                              isDense: true,
+                            ),
+                            style: TextStyle(
+                                fontSize: 11,
+                                color:
+                                    isLabour ? Colors.blue[700] : Colors.black,
+                                fontWeight: isLabour
+                                    ? FontWeight.w600
+                                    : FontWeight.normal),
+                          ),
                         ),
-                    ]),
-                  ]),
-                ),
-                const SizedBox(height: 16),
-                const Text('Notes (Optional)',
-                    style:
-                        TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: notesCtrl,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    hintText: 'Any additional notes or conditions',
-                    hintStyle: TextStyle(fontSize: 12, color: Colors.grey[400]),
-                    filled: true,
-                    fillColor: Colors.grey.shade50,
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Colors.grey.shade200)),
-                    enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Colors.grey.shade200)),
-                    contentPadding: const EdgeInsets.all(12),
+                        SizedBox(
+                          width: 36,
+                          child: TextField(
+                            controller: item['qty'],
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            onChanged: (_) => setSheet(() {}),
+                            decoration: const InputDecoration(
+                              hintText: '1',
+                              hintStyle: TextStyle(fontSize: 11),
+                              border: InputBorder.none,
+                              isDense: true,
+                            ),
+                            style: const TextStyle(fontSize: 11),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        SizedBox(
+                          width: 70,
+                          child: TextField(
+                            controller: item['rate'],
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            onChanged: (_) => setSheet(() {}),
+                            decoration: InputDecoration(
+                              hintText: '0.00',
+                              hintStyle: TextStyle(
+                                  fontSize: 11, color: Colors.grey[400]),
+                              border: InputBorder.none,
+                              isDense: true,
+                              prefixText: 'R',
+                              prefixStyle: TextStyle(
+                                  fontSize: 11, color: Colors.grey[600]),
+                            ),
+                            style: const TextStyle(fontSize: 11),
+                            textAlign: TextAlign.right,
+                          ),
+                        ),
+                        SizedBox(
+                          width: 70,
+                          child: Text(
+                            'R ${lineAmount(item).toStringAsFixed(2)}',
+                            style: const TextStyle(
+                                fontSize: 11, fontWeight: FontWeight.w600),
+                            textAlign: TextAlign.right,
+                          ),
+                        ),
+                        SizedBox(
+                          width: 20,
+                          child: !isLabour && lineItems.length > 2
+                              ? GestureDetector(
+                                  onTap: () =>
+                                      setSheet(() => lineItems.removeAt(i)),
+                                  child: Icon(Icons.remove_circle,
+                                      color: Colors.red[400], size: 14),
+                                )
+                              : const SizedBox(),
+                        ),
+                      ]),
+                    );
+                  }),
+
+                  // Bottom border
+                  Container(
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: const BorderRadius.vertical(
+                          bottom: Radius.circular(10)),
+                    ),
                   ),
-                  style: const TextStyle(fontSize: 13),
-                ),
-                const SizedBox(height: 16),
-                Row(children: [
-                  const Text('Quote valid for',
+                  const SizedBox(height: 16),
+
+                  // Options: Discount, VAT, Deposit
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Column(children: [
+                      // Discount
+                      Row(children: [
+                        Checkbox(
+                          value: includeDiscount,
+                          onChanged: (v) =>
+                              setSheet(() => includeDiscount = v ?? false),
+                          activeColor: Colors.black,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Include Discount',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600)),
+                                Text(
+                                  includeDiscount
+                                      ? 'Discount: R ${discountAmount.toStringAsFixed(2)}'
+                                      : 'Apply discount to subtotal',
+                                  style: TextStyle(
+                                      fontSize: 10, color: Colors.grey[600]),
+                                ),
+                              ]),
+                        ),
+                        if (includeDiscount)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: DropdownButton<double>(
+                              value: discountPercent,
+                              isDense: true,
+                              underline: const SizedBox(),
+                              items: [5, 10, 15, 20, 25, 30, 35, 40]
+                                  .map((p) => DropdownMenuItem(
+                                      value: p.toDouble(),
+                                      child: Text('$p%',
+                                          style:
+                                              const TextStyle(fontSize: 12))))
+                                  .toList(),
+                              onChanged: (v) =>
+                                  setSheet(() => discountPercent = v ?? 5),
+                            ),
+                          ),
+                      ]),
+                      Divider(height: 1, color: Colors.grey.shade200),
+                      // VAT
+                      Row(children: [
+                        Checkbox(
+                          value: includeVat,
+                          onChanged: (v) =>
+                              setSheet(() => includeVat = v ?? false),
+                          activeColor: Colors.black,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Include VAT (15%)',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600)),
+                                Text(
+                                  includeVat
+                                      ? 'VAT: R ${vatAmount.toStringAsFixed(2)}'
+                                      : 'Add 15% VAT to subtotal',
+                                  style: TextStyle(
+                                      fontSize: 10, color: Colors.grey[600]),
+                                ),
+                              ]),
+                        ),
+                      ]),
+                      Divider(height: 1, color: Colors.grey.shade200),
+                      // Deposit
+                      Row(children: [
+                        Checkbox(
+                          value: requireDeposit,
+                          onChanged: (v) =>
+                              setSheet(() => requireDeposit = v ?? false),
+                          activeColor: Colors.black,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Require Deposit',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600)),
+                                Text(
+                                  requireDeposit
+                                      ? '${depositPercent.toInt()}% payable upfront'
+                                      : 'Request upfront deposit',
+                                  style: TextStyle(
+                                      fontSize: 10, color: Colors.grey[600]),
+                                ),
+                              ]),
+                        ),
+                        if (requireDeposit)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: DropdownButton<double>(
+                              value: depositPercent,
+                              isDense: true,
+                              underline: const SizedBox(),
+                              items: [25.0, 30.0, 50.0, 60.0, 70.0]
+                                  .map((p) => DropdownMenuItem(
+                                      value: p,
+                                      child: Text('${p.toInt()}%',
+                                          style:
+                                              const TextStyle(fontSize: 12))))
+                                  .toList(),
+                              onChanged: (v) =>
+                                  setSheet(() => depositPercent = v ?? 50),
+                            ),
+                          ),
+                      ]),
+                    ]),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Totals
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(children: [
+                      Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Subtotal',
+                                style: TextStyle(
+                                    color: Colors.white70, fontSize: 12)),
+                            Text('R ${subtotal.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 12)),
+                          ]),
+                      if (includeDiscount) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Discount (${discountPercent.toInt()}%)',
+                                  style: TextStyle(
+                                      color: Colors.orange[300], fontSize: 12)),
+                              Text('- R ${discountAmount.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                      color: Colors.orange[300], fontSize: 12)),
+                            ]),
+                      ],
+                      if (includeVat) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('VAT (15%)',
+                                  style: TextStyle(
+                                      color: Colors.white70, fontSize: 12)),
+                              Text('R ${vatAmount.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                      color: Colors.white, fontSize: 12)),
+                            ]),
+                      ],
+                      const Divider(color: Colors.white24, height: 16),
+                      Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Total',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold)),
+                            Text('R ${total.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold)),
+                          ]),
+                      if (requireDeposit) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Deposit (${depositPercent.toInt()}%)',
+                                  style: TextStyle(
+                                      color: Colors.amber[300], fontSize: 12)),
+                              Text('R ${depositAmount.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                      color: Colors.amber[300],
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600)),
+                            ]),
+                      ],
+                    ]),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Notes
+                  const Text('Notes (Optional)',
                       style:
                           TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    width: 60,
-                    child: TextField(
-                      controller: validDaysCtrl,
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: Colors.grey.shade50,
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide:
-                                BorderSide(color: Colors.grey.shade200)),
-                        enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide:
-                                BorderSide(color: Colors.grey.shade200)),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 10),
-                        isDense: true,
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: notesCtrl,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      hintText: 'Any additional notes or conditions',
+                      hintStyle:
+                          TextStyle(fontSize: 12, color: Colors.grey[400]),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade200)),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade200)),
+                      contentPadding: const EdgeInsets.all(10),
+                    ),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Valid days
+                  Row(children: [
+                    const Text('Quote valid for',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 55,
+                      child: TextField(
+                        controller: validDaysCtrl,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.grey.shade50,
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide:
+                                  BorderSide(color: Colors.grey.shade200)),
+                          enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide:
+                                  BorderSide(color: Colors.grey.shade200)),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 8),
+                          isDense: true,
+                        ),
+                        style: const TextStyle(fontSize: 12),
                       ),
-                      style: const TextStyle(fontSize: 13),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text('days',
-                      style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-                ]),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: isSending
-                        ? null
-                        : () async {
-                            final items = lineItems
-                                .where((item) =>
-                                    item['desc']!.text.trim().isNotEmpty &&
-                                    item['amount']!.text.trim().isNotEmpty)
-                                .toList();
-                            if (items.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text(
-                                          'Add at least one line item with an amount'),
-                                      backgroundColor: Colors.red));
-                              return;
-                            }
-                            setSheet(() => isSending = true);
-                            try {
-                              final lineItemData = items
-                                  .map((item) => {
-                                        'description':
-                                            item['desc']!.text.trim(),
-                                        'amount': double.tryParse(
-                                                item['amount']!.text.trim()) ??
-                                            0,
-                                      })
+                    const SizedBox(width: 8),
+                    Text('days',
+                        style:
+                            TextStyle(fontSize: 12, color: Colors.grey[600])),
+                  ]),
+                  const SizedBox(height: 20),
+
+                  // Inline error message
+                  if (errorMessage.isNotEmpty)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: Row(children: [
+                        Icon(Icons.error_outline,
+                            color: Colors.red.shade700, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(errorMessage,
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.red.shade700)),
+                        ),
+                      ]),
+                    ),
+
+                  // Send button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: isSending
+                          ? null
+                          : () async {
+                              // ── Validation ─────────────────────────────
+                              void showError(String msg) {
+                                setSheet(() => errorMessage = msg);
+                              }
+
+                              setSheet(() => errorMessage = '');
+
+                              final labourItem = lineItems.firstWhere(
+                                  (item) => item['desc']!.text == 'Labour',
+                                  orElse: () => {});
+                              if (labourItem.isEmpty ||
+                                  (double.tryParse(
+                                              labourItem['rate']?.text ?? '') ??
+                                          0) ==
+                                      0) {
+                                showError('Labour line item requires a rate');
+                                return;
+                              }
+
+                              for (final item in lineItems) {
+                                final qty =
+                                    double.tryParse(item['qty']!.text) ?? 0;
+                                final rate =
+                                    double.tryParse(item['rate']!.text) ?? 0;
+                                if ((qty > 0 && rate == 0) ||
+                                    (rate > 0 && qty == 0)) {
+                                  showError(
+                                      'Each line item needs both Qty and Rate');
+                                  return;
+                                }
+                              }
+
+                              final items = lineItems
+                                  .where((item) =>
+                                      (double.tryParse(item['rate']!.text) ??
+                                              0) >
+                                          0 &&
+                                      (double.tryParse(item['qty']!.text) ??
+                                              0) >
+                                          0)
                                   .toList();
-                              final subtotal = lineItemData.fold<double>(
-                                  0,
-                                  (sum, item) =>
-                                      sum + (item['amount'] as double));
-                              final vatAmount =
-                                  includeVat ? subtotal * 0.15 : 0;
-                              final total = subtotal + vatAmount;
-                              final depositAmount = requireDeposit
-                                  ? total * depositPercent / 100
-                                  : 0;
-                              final callable = FirebaseFunctions.instanceFor(
-                                      region: 'europe-west4')
-                                  .httpsCallable('submitProviderQuote');
-                              await callable.call({
-                                'quoteRequestId': quoteRequestId,
-                                'lineItems': lineItemData,
-                                'subtotal': subtotal,
-                                'vatAmount': vatAmount,
-                                'includeVat': includeVat,
-                                'total': total,
-                                'requireDeposit': requireDeposit,
-                                'depositPercent': depositPercent,
-                                'depositAmount': depositAmount,
-                                'notes': notesCtrl.text.trim(),
-                                'validDays':
-                                    int.tryParse(validDaysCtrl.text) ?? 7,
-                              });
-                              if (mounted) Navigator.pop(ctx);
-                              if (mounted) {
-                                ScaffoldMessenger.of(context)
-                                    .showSnackBar(SnackBar(
-                                  content: Text('Quote sent to $clientName!'),
-                                  backgroundColor: Colors.green,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10)),
-                                ));
-                              }
-                            } catch (e) {
-                              setSheet(() => isSending = false);
-                              if (mounted) {
+
+                              if (items.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                        content:
-                                            Text('Failed to send quote: $e'),
+                                    const SnackBar(
+                                        content: Text(
+                                            'Add at least one line item with Qty and Rate'),
                                         backgroundColor: Colors.red));
+                                return;
                               }
-                            }
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      disabledBackgroundColor: Colors.grey.shade300,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+
+                              setSheet(() => isSending = true);
+                              try {
+                                final lineItemData = items.map((item) {
+                                  final qty = double.tryParse(
+                                          item['qty']!.text.trim()) ??
+                                      0;
+                                  final rate = double.tryParse(
+                                          item['rate']!.text.trim()) ??
+                                      0;
+                                  return {
+                                    'description': item['desc']!.text.trim(),
+                                    'qty': qty,
+                                    'rate': rate,
+                                    'amount': qty * rate,
+                                  };
+                                }).toList();
+
+                                final callable = FirebaseFunctions.instanceFor(
+                                        region: 'europe-west4')
+                                    .httpsCallable('submitProviderQuote');
+                                await callable.call({
+                                  'quoteRequestId': quoteRequestId,
+                                  'lineItems': lineItemData,
+                                  'subtotal': subtotal,
+                                  'discountPercent':
+                                      includeDiscount ? discountPercent : 0,
+                                  'discountAmount': discountAmount,
+                                  'vatAmount': vatAmount,
+                                  'includeVat': includeVat,
+                                  'total': total,
+                                  'requireDeposit': requireDeposit,
+                                  'depositPercent': depositPercent,
+                                  'depositAmount': depositAmount,
+                                  'notes': notesCtrl.text.trim(),
+                                  'validDays':
+                                      int.tryParse(validDaysCtrl.text) ?? 7,
+                                });
+                                if (mounted) Navigator.pop(ctx);
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(SnackBar(
+                                    content: Text('Quote sent to $clientName!'),
+                                    backgroundColor: Colors.green,
+                                    behavior: SnackBarBehavior.floating,
+                                  ));
+                                }
+                              } catch (e) {
+                                setSheet(() => isSending = false);
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                          content:
+                                              Text('Failed to send quote: $e'),
+                                          backgroundColor: Colors.red));
+                                }
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: isSending
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : Text('Send Quote · R${total.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600)),
                     ),
-                    child: isSending
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
-                        : Text(
-                            'Send Quote · R${lineItems.fold<double>(0, (sum, item) => sum + (double.tryParse(item['amount']!.text) ?? 0)).toStringAsFixed(0)}',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600)),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

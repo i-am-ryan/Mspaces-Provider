@@ -28,13 +28,21 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
   final List<Map<String, TextEditingController>> _lineItems = [
     {
       'desc': TextEditingController(),
-      'amount': TextEditingController(),
-    }
+      'qty': TextEditingController(),
+      'rate': TextEditingController(),
+    },
+    {
+      'desc': TextEditingController(text: 'Labour'),
+      'qty': TextEditingController(),
+      'rate': TextEditingController(),
+    },
   ];
   final _notesCtrl = TextEditingController();
   final _validDaysCtrl = TextEditingController(text: '7');
 
   bool _includeVat = false;
+  bool _includeDiscount = false;
+  double _discountPercent = 5;
   bool _requireDeposit = false;
   double _depositPercent = 50;
   bool _isSending = false;
@@ -77,6 +85,7 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
     if (_category.isNotEmpty) {
       _lineItems[0]['desc']!.text = _category;
     }
+    // When category is empty, controller stays empty and hint shows
   }
 
   @override
@@ -84,7 +93,8 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
     _clientSearchCtrl.dispose();
     for (final item in _lineItems) {
       item['desc']!.dispose();
-      item['amount']!.dispose();
+      item['qty']!.dispose();
+      item['rate']!.dispose();
     }
     _notesCtrl.dispose();
     _validDaysCtrl.dispose();
@@ -107,11 +117,28 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
     }
     setState(() => _isSearching = true);
     try {
-      // Search by name
-      final nameSnap = await _firestore
+      // Search by name — try multiple capitalisation variants
+      final queryCapital =
+          query[0].toUpperCase() + query.substring(1).toLowerCase();
+      final queryLower = query.toLowerCase();
+      final queryUpper = query.toUpperCase();
+
+      final nameSnap1 = await _firestore
           .collection('users')
-          .where('fullName', isGreaterThanOrEqualTo: query)
-          .where('fullName', isLessThanOrEqualTo: '$query\uf8ff')
+          .where('fullName', isGreaterThanOrEqualTo: queryCapital)
+          .where('fullName', isLessThanOrEqualTo: '$queryCapital\uf8ff')
+          .limit(5)
+          .get();
+      final nameSnap2 = await _firestore
+          .collection('users')
+          .where('fullName', isGreaterThanOrEqualTo: queryLower)
+          .where('fullName', isLessThanOrEqualTo: '$queryLower\uf8ff')
+          .limit(5)
+          .get();
+      final nameSnap3 = await _firestore
+          .collection('users')
+          .where('fullName', isGreaterThanOrEqualTo: queryUpper)
+          .where('fullName', isLessThanOrEqualTo: '$queryUpper\uf8ff')
           .limit(5)
           .get();
 
@@ -124,7 +151,12 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
           .get();
 
       final Map<String, Map<String, dynamic>> results = {};
-      for (final doc in [...nameSnap.docs, ...emailSnap.docs]) {
+      for (final doc in [
+        ...nameSnap1.docs,
+        ...nameSnap2.docs,
+        ...nameSnap3.docs,
+        ...emailSnap.docs,
+      ]) {
         final data = doc.data();
         // Only include clients (not providers)
         if (data['userType']?.toString() == 'provider') continue;
@@ -153,11 +185,20 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
     });
   }
 
-  double get _subtotal => _lineItems.fold(
-      0, (sum, item) => sum + (double.tryParse(item['amount']!.text) ?? 0));
+  double _lineAmount(Map<String, TextEditingController> item) {
+    final qty = double.tryParse(item['qty']!.text) ?? 0;
+    final rate = double.tryParse(item['rate']!.text) ?? 0;
+    return qty * rate;
+  }
 
-  double get _vatAmount => _includeVat ? _subtotal * 0.15 : 0;
-  double get _total => _subtotal + _vatAmount;
+  double get _subtotal =>
+      _lineItems.fold(0, (sum, item) => sum + _lineAmount(item));
+
+  double get _discountAmount =>
+      _includeDiscount ? _subtotal * _discountPercent / 100 : 0;
+  double get _afterDiscount => _subtotal - _discountAmount;
+  double get _vatAmount => _includeVat ? _afterDiscount * 0.15 : 0;
+  double get _total => _afterDiscount + _vatAmount;
   double get _depositAmount =>
       _requireDeposit ? _total * _depositPercent / 100 : 0;
 
@@ -167,10 +208,29 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
       return;
     }
 
+    // Validate Labour line item
+    final labourItem = _lineItems
+        .firstWhere((item) => item['desc']!.text == 'Labour', orElse: () => {});
+    if (labourItem.isEmpty ||
+        (double.tryParse(labourItem['rate']?.text ?? '') ?? 0) == 0) {
+      _snack('Labour line item requires a rate', error: true);
+      return;
+    }
+
+    // Validate qty/rate pairs
+    for (final item in _lineItems) {
+      final qty = double.tryParse(item['qty']!.text) ?? 0;
+      final rate = double.tryParse(item['rate']!.text) ?? 0;
+      if ((qty > 0 && rate == 0) || (rate > 0 && qty == 0)) {
+        _snack('Each line item needs both Qty and Rate', error: true);
+        return;
+      }
+    }
+
     final items = _lineItems
         .where((item) =>
-            item['desc']!.text.trim().isNotEmpty &&
-            item['amount']!.text.trim().isNotEmpty)
+            (double.tryParse(item['rate']!.text) ?? 0) > 0 &&
+            (double.tryParse(item['qty']!.text) ?? 0) > 0)
         .toList();
 
     if (items.isEmpty) {
@@ -184,12 +244,16 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
 
     setState(() => _isSending = true);
     try {
-      final lineItemData = items
-          .map((item) => {
-                'description': item['desc']!.text.trim(),
-                'amount': double.tryParse(item['amount']!.text.trim()) ?? 0,
-              })
-          .toList();
+      final lineItemData = items.map((item) {
+        final qty = double.tryParse(item['qty']!.text.trim()) ?? 0;
+        final rate = double.tryParse(item['rate']!.text.trim()) ?? 0;
+        return {
+          'description': item['desc']!.text.trim(),
+          'qty': qty,
+          'rate': rate,
+          'amount': qty * rate,
+        };
+      }).toList();
 
       final validDays = int.tryParse(_validDaysCtrl.text) ?? 7;
       final validUntil = DateTime.now().add(Duration(days: validDays));
@@ -226,6 +290,8 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
             _bookingId.isNotEmpty ? 'onsite_assessment' : 'provider_initiated',
         'quote': {
           'lineItems': lineItemData,
+          'discountPercent': _includeDiscount ? _discountPercent : 0,
+          'discountAmount': _discountAmount,
           'subtotal': _subtotal,
           'vatAmount': _vatAmount,
           'includeVat': _includeVat,
@@ -354,7 +420,8 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
               TextButton.icon(
                 onPressed: () => setState(() => _lineItems.add({
                       'desc': TextEditingController(),
-                      'amount': TextEditingController(),
+                      'qty': TextEditingController(text: '1'),
+                      'rate': TextEditingController(),
                     })),
                 icon: const Icon(Icons.add, size: 16, color: Colors.black),
                 label: const Text('Add', style: TextStyle(color: Colors.black)),
@@ -362,68 +429,163 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
             ],
           ),
           const SizedBox(height: 8),
+          // Table header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(10)),
+            ),
+            child: Row(children: [
+              const Expanded(
+                flex: 4,
+                child: Text('Description',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold)),
+              ),
+              SizedBox(
+                width: 40,
+                child: const Text('Qty',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center),
+              ),
+              SizedBox(
+                width: 75,
+                child: const Text('Rate',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.right),
+              ),
+              SizedBox(
+                width: 75,
+                child: const Text('Amount',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.right),
+              ),
+              const SizedBox(width: 24),
+            ]),
+          ),
           Column(
             children: _lineItems.asMap().entries.map((e) {
               final i = e.key;
               final item = e.value;
+              final isLabour = item['desc']!.text == 'Labour';
               return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 1),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(10),
+                  color: isLabour ? Colors.blue.shade50 : Colors.grey.shade50,
                   border: Border.all(color: Colors.grey.shade200),
                 ),
                 child: Row(children: [
+                  // Description
                   Expanded(
-                    flex: 3,
+                    flex: 4,
                     child: TextField(
                       controller: item['desc'],
                       onChanged: (_) => setState(() {}),
+                      readOnly: isLabour,
                       decoration: InputDecoration(
-                        hintText: 'Description',
+                        hintText:
+                            isLabour ? 'Labour' : 'Enter item description here',
                         hintStyle:
                             TextStyle(fontSize: 12, color: Colors.grey[400]),
                         border: InputBorder.none,
                         isDense: true,
                       ),
-                      style: const TextStyle(fontSize: 13),
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: isLabour ? Colors.blue[700] : Colors.black,
+                          fontWeight:
+                              isLabour ? FontWeight.w600 : FontWeight.normal),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  // Qty
                   SizedBox(
-                    width: 100,
+                    width: 40,
                     child: TextField(
-                      controller: item['amount'],
+                      controller: item['qty'],
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(
+                        hintText: 'Qty',
+                        hintStyle: TextStyle(fontSize: 11),
+                        border: InputBorder.none,
+                        isDense: true,
+                      ),
+                      style: const TextStyle(fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  // Rate
+                  SizedBox(
+                    width: 75,
+                    child: TextField(
+                      controller: item['rate'],
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
                       onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
                         hintText: '0.00',
                         hintStyle:
-                            TextStyle(fontSize: 12, color: Colors.grey[400]),
+                            TextStyle(fontSize: 11, color: Colors.grey[400]),
                         border: InputBorder.none,
                         isDense: true,
-                        prefixText: 'R ',
+                        prefixText: 'R',
                         prefixStyle:
-                            TextStyle(fontSize: 13, color: Colors.grey[600]),
+                            TextStyle(fontSize: 11, color: Colors.grey[600]),
                       ),
-                      style: const TextStyle(fontSize: 13),
+                      style: const TextStyle(fontSize: 12),
                       textAlign: TextAlign.right,
                     ),
                   ),
-                  if (_lineItems.length > 1)
-                    GestureDetector(
-                      onTap: () => setState(() => _lineItems.removeAt(i)),
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Icon(Icons.remove_circle,
-                            color: Colors.red[400], size: 18),
-                      ),
+                  // Amount (calculated)
+                  SizedBox(
+                    width: 75,
+                    child: Text(
+                      'R ${_lineAmount(item).toStringAsFixed(2)}',
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600),
+                      textAlign: TextAlign.right,
                     ),
+                  ),
+                  // Delete button
+                  SizedBox(
+                    width: 24,
+                    child: _lineItems.length > 1 && !isLabour
+                        ? GestureDetector(
+                            onTap: () => setState(() => _lineItems.removeAt(i)),
+                            child: Icon(Icons.remove_circle,
+                                color: Colors.red[400], size: 16),
+                          )
+                        : const SizedBox(),
+                  ),
                 ]),
               );
             }).toList(),
+          ),
+          const SizedBox(height: 1),
+          // Bottom border
+          Container(
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius:
+                  const BorderRadius.vertical(bottom: Radius.circular(10)),
+            ),
           ),
           const SizedBox(height: 16),
 
@@ -435,6 +597,51 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
               border: Border.all(color: Colors.grey.shade200),
             ),
             child: Column(children: [
+              // Discount
+              Row(children: [
+                Checkbox(
+                  value: _includeDiscount,
+                  onChanged: (v) =>
+                      setState(() => _includeDiscount = v ?? false),
+                  activeColor: Colors.black,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Include Discount',
+                            style: TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w600)),
+                        Text(
+                          _includeDiscount
+                              ? 'Discount: R ${_discountAmount.toStringAsFixed(2)}'
+                              : 'Apply discount to subtotal',
+                          style:
+                              TextStyle(fontSize: 11, color: Colors.grey[600]),
+                        ),
+                      ]),
+                ),
+                if (_includeDiscount)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: DropdownButton<double>(
+                      value: _discountPercent,
+                      isDense: true,
+                      underline: const SizedBox(),
+                      items: [5, 10, 15, 20, 25, 30, 35, 40]
+                          .map((p) => DropdownMenuItem(
+                              value: p.toDouble(),
+                              child: Text('$p%',
+                                  style: const TextStyle(fontSize: 13))))
+                          .toList(),
+                      onChanged: (v) =>
+                          setState(() => _discountPercent = v ?? 5),
+                    ),
+                  ),
+              ]),
+              Divider(height: 1, color: Colors.grey.shade200),
               Row(children: [
                 Checkbox(
                   value: _includeVat,
@@ -522,6 +729,19 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
                 Text('R ${_subtotal.toStringAsFixed(2)}',
                     style: const TextStyle(color: Colors.white, fontSize: 13)),
               ]),
+              if (_includeDiscount) ...[
+                const SizedBox(height: 6),
+                Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Discount (${_discountPercent.toInt()}%)',
+                          style: TextStyle(
+                              color: Colors.orange[300], fontSize: 13)),
+                      Text('- R ${_discountAmount.toStringAsFixed(2)}',
+                          style: TextStyle(
+                              color: Colors.orange[300], fontSize: 13)),
+                    ]),
+              ],
               if (_includeVat) ...[
                 const SizedBox(height: 6),
                 Row(
