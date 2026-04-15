@@ -20,6 +20,7 @@ import '../../presentation/screens/provider/schedule/availability_settings_scree
 import '../../presentation/screens/provider/earnings/provider_earnings_screen.dart';
 import '../../presentation/screens/provider/earnings/transactions_screen.dart';
 import '../../presentation/screens/provider/earnings/payout_settings_screen.dart';
+import '../../presentation/screens/provider/earnings/banking_details_screen.dart';
 import '../../presentation/screens/provider/profile/provider_profile_screen.dart';
 import '../../presentation/screens/provider/services/services_management_screen.dart';
 import '../../presentation/screens/provider/chat/chat_detail_screen.dart';
@@ -195,6 +196,11 @@ class AppRouter {
         path: '/provider-payout-settings',
         name: 'provider-payout-settings',
         builder: (context, state) => const PayoutSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/provider-banking-details',
+        name: 'provider-banking-details',
+        builder: (context, state) => const BankingDetailsScreen(),
       ),
 
       // ── Profile ─────────────────────────────────────────────────

@@ -1,33 +1,52 @@
 // lib/presentation/widgets/common/banking_details_banner.dart
-
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-/// Shows a dismissible banner when banking details are missing.
-/// Add this near the top of any home/dashboard screen.
+/// Shows a centre-screen overlay modal when banking details are missing.
+/// Wrap the home/dashboard screen with this widget.
 class BankingDetailsBanner extends StatefulWidget {
-  /// Route to push when user taps "Add Now"
-  /// Client app: '/banking-details'
-  /// Provider app: '/provider-payout-settings'
   final String route;
+  final Widget child;
 
-  const BankingDetailsBanner({Key? key, required this.route}) : super(key: key);
+  const BankingDetailsBanner({
+    Key? key,
+    required this.route,
+    required this.child,
+  }) : super(key: key);
 
   @override
   State<BankingDetailsBanner> createState() => _BankingDetailsBannerState();
 }
 
-class _BankingDetailsBannerState extends State<BankingDetailsBanner> {
-  bool _hasBanking = true; // default true to avoid flash
-  bool _dismissed = false;
+class _BankingDetailsBannerState extends State<BankingDetailsBanner>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+
+  bool _showing = false;
   bool _checked = false;
 
   @override
   void initState() {
     super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+    _scaleAnimation =
+        CurvedAnimation(parent: _controller, curve: Curves.easeOutBack);
+    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
     _checkBankingDetails();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   Future<void> _checkBankingDetails() async {
@@ -42,76 +61,129 @@ class _BankingDetailsBannerState extends State<BankingDetailsBanner> {
       final hasValidBanking = hasBanking ||
           (banking != null &&
               banking['accountNumber']?.toString().isNotEmpty == true);
-      if (mounted) {
+      if (!hasValidBanking && mounted) {
         setState(() {
-          _hasBanking = hasValidBanking;
+          _showing = true;
           _checked = true;
         });
+        _controller.forward();
+      } else {
+        if (mounted) setState(() => _checked = true);
       }
     } catch (_) {
       if (mounted) setState(() => _checked = true);
     }
   }
 
+  void _dismiss() {
+    _controller.reverse().then((_) {
+      if (mounted) setState(() => _showing = false);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (!_checked || _hasBanking || _dismissed) return const SizedBox.shrink();
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orange.shade300),
-      ),
-      child: Row(children: [
-        Icon(Icons.account_balance_outlined,
-            color: Colors.orange.shade700, size: 22),
-        const SizedBox(width: 12),
-        Expanded(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Banking details missing',
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.orange.shade800)),
-            Text(
-              'Add your banking details to receive payouts and refunds.',
-              style: TextStyle(
-                  fontSize: 12, color: Colors.orange.shade700, height: 1.3),
-            ),
-          ]),
-        ),
-        const SizedBox(width: 8),
-        Column(children: [
-          GestureDetector(
-            onTap: () => context.push(widget.route),
+    return Stack(
+      children: [
+        widget.child,
+        if (_showing)
+          FadeTransition(
+            opacity: _fadeAnimation,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade700,
-                borderRadius: BorderRadius.circular(8),
+              color: Colors.black.withValues(alpha: 0.5),
+              child: Center(
+                child: ScaleTransition(
+                  scale: _scaleAnimation,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 32),
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x33000000),
+                            blurRadius: 24,
+                            offset: Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Icon
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFF5F5F5),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.account_balance_outlined,
+                                size: 28, color: Colors.black),
+                          ),
+                          const SizedBox(height: 16),
+                          // Title
+                          const Text(
+                            'Banking Details Missing',
+                            style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          // Body
+                          const Text(
+                            'Add your banking details to receive payouts and refunds.',
+                            style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF666666),
+                                height: 1.4),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 24),
+                          // Add Now button
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                _dismiss();
+                                context.push(widget.route);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.black,
+                                foregroundColor: Colors.white,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                              ),
+                              child: const Text('Add Banking Details',
+                                  style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Dismiss
+                          TextButton(
+                            onPressed: _dismiss,
+                            child: const Text('Remind me later',
+                                style: TextStyle(
+                                    fontSize: 13, color: Color(0xFF999999))),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              child: const Text('Add Now',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold)),
             ),
           ),
-          const SizedBox(height: 4),
-          GestureDetector(
-            onTap: () => setState(() => _dismissed = true),
-            child: Text('Dismiss',
-                style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.orange.shade600,
-                    decoration: TextDecoration.underline)),
-          ),
-        ]),
-      ]),
+      ],
     );
   }
 }

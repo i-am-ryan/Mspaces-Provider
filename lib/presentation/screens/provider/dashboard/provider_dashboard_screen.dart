@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../widgets/common/offers_carousel.dart';
+import '../../../widgets/common/banking_details_banner.dart';
 
 class ProviderDashboardScreen extends StatefulWidget {
   const ProviderDashboardScreen({Key? key}) : super(key: key);
@@ -29,6 +30,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
   int _completedWeek = 0;
 
   bool _loading = true;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -178,47 +180,86 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      body: SafeArea(
-        child: _loading
-            ? const Center(
-                child: CircularProgressIndicator(color: Colors.black))
-            : RefreshIndicator(
-                onRefresh: _loadDashboard,
-                color: Colors.black,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── Hero banner ───────────────────────────────────
-                      _buildHeroBanner(),
-                      Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildStatsGrid(),
-                            const SizedBox(height: 24),
-                            _buildQuickActions(),
-                            const SizedBox(height: 24),
-                          ],
+    return BankingDetailsBanner(
+      route: '/provider-banking-details',
+      child: Scaffold(
+        backgroundColor: Colors.grey.shade50,
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: (index) {
+            setState(() => _selectedIndex = index);
+            switch (index) {
+              case 0:
+                break;
+              case 1:
+                context.push('/provider-job-requests');
+                break;
+              case 2:
+                context.push('/provider-calendar');
+                break;
+              case 3:
+                context.push('/provider-earnings');
+                break;
+              case 4:
+                context.push('/provider-profile');
+                break;
+            }
+          },
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: Colors.black,
+          unselectedItemColor: Colors.grey,
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.work_outline), label: 'Jobs'),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.calendar_today), label: 'Calendar'),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.account_balance_wallet_outlined),
+                label: 'Earnings'),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.person_outline), label: 'Profile'),
+          ],
+        ),
+        body: SafeArea(
+          child: _loading
+              ? const Center(
+                  child: CircularProgressIndicator(color: Colors.black))
+              : RefreshIndicator(
+                  onRefresh: _loadDashboard,
+                  color: Colors.black,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Hero banner ───────────────────────────────────
+                        _buildHeroBanner(),
+                        Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildStatsGrid(),
+                              const SizedBox(height: 24),
+                              _buildQuickActions(),
+                              const SizedBox(height: 24),
+                            ],
+                          ),
                         ),
-                      ),
-                      // ── Offers ────────────────────────────────────────
-                      const OffersCarousel(targetType: 'providers'),
-                      const SizedBox(height: 80),
-                    ],
+                        // ── Offers ────────────────────────────────────────
+                        const OffersCarousel(targetType: 'providers'),
+                        const SizedBox(height: 80),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+        ),
       ),
     );
   }
 
-  // ── Hero Banner ───────────────────────────────────────────────────────────
-
+  // ── Hero Banner
   Widget _buildHeroBanner() {
     final initials = _displayName
         .trim()
@@ -316,20 +357,30 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                   icon: const Icon(Icons.notifications_outlined,
                       color: Colors.white, size: 26),
                 ),
-                // Unread badge
-                if (_pendingCount > 0)
-                  Positioned(
-                    right: 8,
-                    top: 8,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(_uid)
+                      .collection('notifications')
+                      .where('read', isEqualTo: false)
+                      .snapshots(),
+                  builder: (context, snap) {
+                    final count = snap.data?.docs.length ?? 0;
+                    if (count == 0) return const SizedBox.shrink();
+                    return Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
+                ),
               ]),
             ],
           ),
