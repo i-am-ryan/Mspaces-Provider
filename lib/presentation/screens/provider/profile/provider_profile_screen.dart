@@ -905,21 +905,15 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
               _buildReviewsSection(),
               const SizedBox(height: 16),
             ],
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _signOut,
-                icon: const Icon(Icons.logout, color: Colors.white),
-                label: const Text('Sign Out',
-                    style: TextStyle(color: Colors.white)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-              ),
-            ),
+            // Security
+            const SizedBox(height: 8),
+            _buildSecuritySection(),
+            const SizedBox(height: 16),
+            // Help & Support
+            _buildHelpSection(),
+            const SizedBox(height: 16),
+            // Danger zone
+            _buildDangerZone(),
             const SizedBox(height: 32),
           ],
         ),
@@ -927,7 +921,366 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
     );
   }
 
-  // ── Widget helpers ─────────────────────────────────────────────────────────
+  // ── Change password ───────────────────────────────────────────────────────
+
+  void _showChangePasswordDialog() {
+    final currentCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    bool obscureCurrent = true, obscureNew = true, obscureConfirm = true;
+    bool saving = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Change Password'),
+          content: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              _dialogPasswordField(
+                  'Current Password',
+                  currentCtrl,
+                  obscureCurrent,
+                  () => setDialogState(() => obscureCurrent = !obscureCurrent)),
+              const SizedBox(height: 12),
+              _dialogPasswordField('New Password', newCtrl, obscureNew,
+                  () => setDialogState(() => obscureNew = !obscureNew)),
+              const SizedBox(height: 12),
+              _dialogPasswordField(
+                  'Confirm New Password',
+                  confirmCtrl,
+                  obscureConfirm,
+                  () => setDialogState(() => obscureConfirm = !obscureConfirm)),
+            ]),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
+              onPressed: saving
+                  ? null
+                  : () async {
+                      if (newCtrl.text != confirmCtrl.text) {
+                        _showSnack('Passwords do not match', error: true);
+                        return;
+                      }
+                      if (newCtrl.text.length < 6) {
+                        _showSnack('Password must be at least 6 characters',
+                            error: true);
+                        return;
+                      }
+                      setDialogState(() => saving = true);
+                      try {
+                        final user = FirebaseAuth.instance.currentUser!;
+                        final cred = EmailAuthProvider.credential(
+                            email: user.email!, password: currentCtrl.text);
+                        await user.reauthenticateWithCredential(cred);
+                        await user.updatePassword(newCtrl.text);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        _showSnack('Password changed successfully');
+                      } on FirebaseAuthException catch (e) {
+                        _showSnack(e.message ?? 'Failed to change password',
+                            error: true);
+                      } finally {
+                        setDialogState(() => saving = false);
+                      }
+                    },
+              child: saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text('Change', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _dialogPasswordField(String label, TextEditingController ctrl,
+      bool obscure, VoidCallback onToggle) {
+    return TextField(
+      controller: ctrl,
+      obscureText: obscure,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        suffixIcon: IconButton(
+          icon:
+              Icon(obscure ? Icons.visibility_off : Icons.visibility, size: 18),
+          onPressed: onToggle,
+        ),
+      ),
+    );
+  }
+
+  // ── Delete account ────────────────────────────────────────────────────────
+
+  void _showDeleteAccountDialog() {
+    final confirmCtrl = TextEditingController();
+    bool deleting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Row(children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 22),
+            SizedBox(width: 8),
+            Text('Delete Account', style: TextStyle(color: Colors.red)),
+          ]),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('What happens when you delete your account:',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red.shade800)),
+                      const SizedBox(height: 6),
+                      ...const [
+                        '• Your account will be deactivated immediately',
+                        '• All data will be retained for 30 days',
+                        '• You can reactivate by signing in within 30 days',
+                        '• After 30 days, all data is permanently deleted',
+                        '• Active jobs and invoices will be preserved',
+                      ].map((t) => Padding(
+                            padding: const EdgeInsets.only(bottom: 3),
+                            child: Text(t,
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.red.shade700)),
+                          )),
+                    ]),
+              ),
+              const SizedBox(height: 16),
+              const Text('Type DELETE to confirm:',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: confirmCtrl,
+                decoration: InputDecoration(
+                  hintText: 'DELETE',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
+                textCapitalization: TextCapitalization.characters,
+                onChanged: (_) => setDialogState(() {}),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: confirmCtrl.text == 'DELETE'
+                    ? Colors.red
+                    : Colors.grey.shade300,
+              ),
+              onPressed: (confirmCtrl.text != 'DELETE' || deleting)
+                  ? null
+                  : () async {
+                      setDialogState(() => deleting = true);
+                      try {
+                        final uid = FirebaseAuth.instance.currentUser?.uid;
+                        if (uid == null) throw Exception('Not signed in');
+                        await FirebaseFirestore.instance
+                            .collection('pending_deletions')
+                            .doc(uid)
+                            .set({
+                          'userId': uid,
+                          'email': FirebaseAuth.instance.currentUser?.email,
+                          'requestedAt': FieldValue.serverTimestamp(),
+                          'scheduledDeletionAt': Timestamp.fromDate(
+                              DateTime.now().add(const Duration(days: 30))),
+                          'status': 'pending',
+                        });
+                        await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(uid)
+                            .update({
+                          'accountStatus': 'pending_deletion',
+                          'deletionRequestedAt': FieldValue.serverTimestamp(),
+                        });
+                        await FirebaseAuth.instance.signOut();
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (mounted) context.go('/login');
+                      } catch (e) {
+                        _showSnack(
+                            'Failed to request deletion: ${e.toString()}',
+                            error: true);
+                        setDialogState(() => deleting = false);
+                      }
+                    },
+              child: deleting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text('Delete Account',
+                      style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Security section ──────────────────────────────────────────────────────
+
+  Widget _buildSecuritySection() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Security',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        _buildProfileTile(
+          icon: Icons.lock_reset_outlined,
+          title: 'Change Password',
+          subtitle: 'Update your account password',
+          onTap: _showChangePasswordDialog,
+        ),
+      ]),
+    );
+  }
+
+  // ── Help & support ────────────────────────────────────────────────────────
+
+  Widget _buildHelpSection() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Help & Support',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        _buildProfileTile(
+          icon: Icons.help_outline,
+          title: 'Help & Support',
+          subtitle: 'FAQ, contact us, and submit a ticket',
+          onTap: () => context.push('/provider-help-support'),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('App Version',
+                style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey[500],
+                    fontWeight: FontWeight.w500)),
+            const SizedBox(height: 2),
+            const Text('Mspaces Provider v1.0.0 (staging)',
+                style: TextStyle(fontSize: 13)),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  // ── Danger zone ───────────────────────────────────────────────────────────
+
+  Widget _buildDangerZone() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Account',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 16),
+        _buildProfileTile(
+          icon: Icons.logout,
+          title: 'Sign Out',
+          subtitle: 'Sign out of your account',
+          onTap: _signOut,
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.red.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.red.shade200),
+          ),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Icon(Icons.delete_forever_outlined,
+                  color: Colors.red.shade700, size: 20),
+              const SizedBox(width: 8),
+              Text('Delete Account',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red.shade700)),
+            ]),
+            const SizedBox(height: 6),
+            Text(
+              'Permanently delete your account and all associated data. '
+              'Your data will be retained for 30 days.',
+              style: TextStyle(fontSize: 12, color: Colors.red.shade600),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _showDeleteAccountDialog,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: BorderSide(color: Colors.red.shade400),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: const Text('Request Account Deletion',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  void _showSnack(String msg, {bool error = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: error ? Colors.red : Colors.green,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ));
+  }
+
+  // ── Widget helpers
 
   Widget _buildHeaderSection(String email) {
     return Column(children: [
@@ -1084,6 +1437,57 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
           const SizedBox(height: 12),
           ...children,
         ],
+      ),
+    );
+  }
+
+  Widget _buildProfileTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    bool isDestructive = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x0A000000), blurRadius: 6, offset: Offset(0, 2))
+          ],
+        ),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isDestructive ? Colors.red.shade50 : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon,
+                size: 18,
+                color: isDestructive ? Colors.red.shade700 : Colors.black),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title,
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color:
+                          isDestructive ? Colors.red.shade700 : Colors.black)),
+              Text(subtitle,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+            ]),
+          ),
+          Icon(Icons.chevron_right, color: Colors.grey[400], size: 18),
+        ]),
       ),
     );
   }
