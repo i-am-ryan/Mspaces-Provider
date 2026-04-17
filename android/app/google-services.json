@@ -16,9 +16,6 @@
       "api_key": [
         {
           "current_key": "AIzaSyC3MvH3VwspWAhuUa23dAsf2BHVRVvx47Q"
-        },
-        {
-          "current_key": "AIzaSyCUY_AWKCM8Nl5Dxuyknx4xMyNUCRYW3U4"
         }
       ],
       "services": {
@@ -38,9 +35,6 @@
       "api_key": [
         {
           "current_key": "AIzaSyC3MvH3VwspWAhuUa23dAsf2BHVRVvx47Q"
-        },
-        {
-          "current_key": "AIzaSyCUY_AWKCM8Nl5Dxuyknx4xMyNUCRYW3U4"
         }
       ],
       "services": {
@@ -60,9 +54,42 @@
       "api_key": [
         {
           "current_key": "AIzaSyC3MvH3VwspWAhuUa23dAsf2BHVRVvx47Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:397431518720:android:a3dcab2d91b142db818ae5",
+        "android_client_info": {
+          "package_name": "za.co.matanabba.mspaces.staging"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "397431518720-e9tm03i9akobgodujvti56m2eicg976g.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "za.co.matanabba.mspaces.staging",
+            "certificate_hash": "ce403122937b502fb44ba500c32e1acdb7473829"
+          }
         },
         {
-          "current_key": "AIzaSyCUY_AWKCM8Nl5Dxuyknx4xMyNUCRYW3U4"
+          "client_id": "397431518720-l8e42au0e05fvs1vo3imh23fqr2ue0ru.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "za.co.matanabba.mspaces.staging",
+            "certificate_hash": "ec8ff86dfe2335c1635a133f2d5c27c680de2621"
+          }
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC3MvH3VwspWAhuUa23dAsf2BHVRVvx47Q"
         }
       ],
       "services": {

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -8,7 +10,7 @@ plugins {
 android {
     namespace = "com.mspaces.provider"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
@@ -28,9 +30,22 @@ android {
         versionName = flutter.versionName
     }
 
+    val keyPropertiesFile = rootProject.file("key.properties")
+    val keyProperties = Properties()
+    if (keyPropertiesFile.exists()) keyProperties.load(keyPropertiesFile.inputStream())
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("mspaces-release.jks")
+            storePassword = keyProperties["KEYSTORE_PASSWORD"] as String? ?: ""
+            keyAlias = keyProperties["KEY_ALIAS"] as String? ?: "mspaces"
+            keyPassword = keyProperties["KEY_PASSWORD"] as String? ?: ""
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
