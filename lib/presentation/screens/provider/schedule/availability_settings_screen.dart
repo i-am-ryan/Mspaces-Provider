@@ -24,6 +24,20 @@ class _AvailabilitySettingsScreenState
   bool _isSaving = false;
 
   String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
+  String? _providerDocId;
+
+  Future<String?> _getProviderDocId() async {
+    if (_providerDocId != null) return _providerDocId;
+    final snap = await FirebaseFirestore.instance
+        .collection('service_providers')
+        .where('userId', isEqualTo: _uid)
+        .limit(1)
+        .get();
+    if (snap.docs.isNotEmpty) {
+      _providerDocId = snap.docs.first.id;
+    }
+    return _providerDocId;
+  }
 
   final Map<String, Map<String, dynamic>> _weeklySchedule = {
     'Monday': {'enabled': true, 'start': '08:00', 'end': '18:00'},
@@ -45,9 +59,14 @@ class _AvailabilitySettingsScreenState
 
   Future<void> _loadFromFirestore() async {
     try {
+      final docId = await _getProviderDocId();
+      if (docId == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
       final doc = await FirebaseFirestore.instance
           .collection('service_providers')
-          .doc(_uid)
+          .doc(docId)
           .get();
 
       if (!doc.exists) {
@@ -112,9 +131,11 @@ class _AvailabilitySettingsScreenState
         };
       }
 
+      final docId = await _getProviderDocId();
+      if (docId == null) throw Exception('Provider document not found');
       await FirebaseFirestore.instance
           .collection('service_providers')
-          .doc(_uid)
+          .doc(docId)
           .update({
         'isAvailable': _isAvailable,
         'availability': {
@@ -141,7 +162,7 @@ class _AvailabilitySettingsScreenState
                 desiredAccuracy: LocationAccuracy.high);
             await FirebaseFirestore.instance
                 .collection('service_providers')
-                .doc(_uid)
+                .doc(docId)
                 .update({
               'liveLocation': {
                 'latitude': pos.latitude,
