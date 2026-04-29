@@ -1089,25 +1089,57 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             const SizedBox(height: 10),
           ],
 
-          // Start Journey button
+          // Start Journey button — only after payment
           if (status == 'confirmed' || status == 'accepted') ...[
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _isUpdating ? null : _startJourney,
-                icon: const Icon(Icons.navigation, color: Colors.white),
-                label: const Text('Start Journey to Client',
-                    style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w600)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+            Builder(builder: (context) {
+              final paymentStatus = data['paymentStatus']?.toString() ?? '';
+              final isPaid = paymentStatus == 'callout_paid' ||
+                  paymentStatus == 'deposit_paid' ||
+                  paymentStatus == 'fully_paid' ||
+                  paymentStatus == 'deposit_not_required';
+              return Column(children: [
+                if (!isPaid)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: Row(children: [
+                      Icon(Icons.info_outline,
+                          size: 16, color: Colors.orange.shade700),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Waiting for client payment before journey can start.',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.orange.shade800),
+                        ),
+                      ),
+                    ]),
+                  ),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: (_isUpdating || !isPaid) ? null : _startJourney,
+                    icon: const Icon(Icons.navigation, color: Colors.white),
+                    label: const Text('Start Journey to Client',
+                        style: TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.w600)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      disabledBackgroundColor: Colors.grey.shade300,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 10),
+                const SizedBox(height: 10),
+              ]); // Builder
+            }),
           ],
 
           // I Have Arrived button
