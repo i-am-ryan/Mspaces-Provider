@@ -30,6 +30,9 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
         'accepted',
         'in_progress',
         'assessment_complete',
+        'rescheduled_pending_client',
+        'provider_en_route',
+        'provider_arrived',
       ]).snapshots();
 
   Stream<QuerySnapshot> get _allQuotesStream => FirebaseFirestore.instance
@@ -1109,6 +1112,18 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
       case 'assessment_complete':
         statusColor = Colors.teal;
         statusLabel = 'Assessment Done';
+        break;
+      case 'rescheduled_pending_client':
+        statusColor = Colors.purple;
+        statusLabel = 'Awaiting Client Confirmation';
+        break;
+      case 'provider_en_route':
+        statusColor = Colors.blue;
+        statusLabel = 'En Route';
+        break;
+      case 'provider_arrived':
+        statusColor = Colors.green;
+        statusLabel = 'Arrived';
         break;
       default:
         statusColor = Colors.grey;
