@@ -26,7 +26,10 @@ class _ActiveJobsScreenState extends State<ActiveJobsScreen>
         'accepted',
         'in_progress',
         'confirmed',
-        'pending_provider_confirmation'
+        'pending_provider_confirmation',
+        'rescheduled_pending_client',
+        'provider_en_route',
+        'provider_arrived',
       ]).snapshots();
 
   Stream<QuerySnapshot> get _acceptedQuotesStream => FirebaseFirestore.instance
@@ -188,8 +191,21 @@ class _ActiveJobsScreenState extends State<ActiveJobsScreen>
     final address = d['address'] ?? d['location'] ?? '—';
     final clientPhone = d['clientPhone'] as String? ?? '';
     final isInProgress = status == 'in_progress';
-    final statusColor = isInProgress ? Colors.green : Colors.orange;
-    final statusText = isInProgress ? 'In Progress' : 'Accepted';
+    final isRescheduled = status == 'rescheduled_pending_client';
+    final statusColor = isInProgress
+        ? Colors.green
+        : isRescheduled
+            ? Colors.purple
+            : Colors.orange;
+    final statusText = isInProgress
+        ? 'In Progress'
+        : isRescheduled
+            ? 'Awaiting Client Confirmation'
+            : status == 'provider_en_route'
+                ? 'En Route'
+                : status == 'provider_arrived'
+                    ? 'Arrived'
+                    : 'Accepted';
     final dateTimeStr = _formatDateTime(d['scheduledDate'], scheduledTime);
 
     return Container(

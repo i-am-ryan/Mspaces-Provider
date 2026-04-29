@@ -681,6 +681,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         text = 'COMPLETED';
         icon = Icons.task_alt;
         break;
+      case 'rescheduled_pending_client':
+        color = Colors.purple;
+        text = 'AWAITING CLIENT CONFIRMATION';
+        icon = Icons.calendar_today_outlined;
+        break;
       default:
         color = Colors.grey;
         text = status.toUpperCase();

@@ -905,6 +905,9 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
               _buildReviewsSection(),
               const SizedBox(height: 16),
             ],
+            // Documents
+            const SizedBox(height: 16),
+            _buildDocumentsSection(),
             // Security
             const SizedBox(height: 8),
             _buildSecuritySection(),
@@ -1148,6 +1151,125 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
         ),
       ),
     );
+  }
+
+  // ── Documents section ─────────────────────────────────────────────────────
+
+  Widget _buildDocumentsSection() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('service_providers')
+          .where('userId',
+              isEqualTo: FirebaseAuth.instance.currentUser?.uid ?? '')
+          .limit(1)
+          .snapshots(),
+      builder: (context, snap) {
+        final data = snap.hasData && snap.data!.docs.isNotEmpty
+            ? snap.data!.docs.first.data() as Map<String, dynamic>
+            : <String, dynamic>{};
+        final docs = data['verificationDocuments'] as Map? ?? {};
+        final idDoc = docs['id_document'] as Map?;
+        final regDoc = docs['registration_body'] as Map?;
+        final bankDoc = docs['bank_confirmation'] as Map?;
+
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(children: [
+            // Dark header
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+              decoration: const BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+              ),
+              child: Row(children: [
+                const Icon(Icons.folder_outlined,
+                    size: 16, color: Colors.white70),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text('Documents & Credentials',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white)),
+                ),
+                TextButton(
+                  onPressed: () => context.push('/provider-documents'),
+                  child: const Text('Manage',
+                      style: TextStyle(
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12)),
+                ),
+              ]),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(children: [
+                _docStatusRow(Icons.badge_outlined, 'ID / Passport Copy',
+                    idDoc?['status'] as String?),
+                const SizedBox(height: 10),
+                _docStatusRow(
+                    Icons.business_outlined,
+                    'Company Registration',
+                    (docs['company_registration'] as Map?)?['status']
+                        as String?,
+                    optional: true),
+                const SizedBox(height: 10),
+                _docStatusRow(Icons.workspace_premium_outlined,
+                    'Professional Registration', regDoc?['status'] as String?),
+                const SizedBox(height: 10),
+                _docStatusRow(Icons.account_balance_outlined,
+                    'Bank Account Confirmation', bankDoc?['status'] as String?),
+              ]),
+            ),
+          ]),
+        );
+      },
+    );
+  }
+
+  Widget _docStatusRow(IconData icon, String title, String? status,
+      {bool optional = false}) {
+    Color color;
+    String label;
+    switch (status) {
+      case 'approved':
+        color = Colors.green;
+        label = 'Approved';
+        break;
+      case 'rejected':
+        color = Colors.red;
+        label = 'Rejected';
+        break;
+      case 'pending_review':
+        color = Colors.orange;
+        label = 'Under Review';
+        break;
+      default:
+        color = optional ? Colors.grey.shade400 : Colors.grey;
+        label = optional ? 'Optional' : 'Not Uploaded';
+    }
+    return Row(children: [
+      Icon(icon, size: 16, color: Colors.grey[500]),
+      const SizedBox(width: 10),
+      Expanded(child: Text(title, style: const TextStyle(fontSize: 13))),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 10, color: color, fontWeight: FontWeight.bold)),
+      ),
+    ]);
   }
 
   // ── Security section ──────────────────────────────────────────────────────

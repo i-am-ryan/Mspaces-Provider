@@ -23,6 +23,7 @@ import '../../presentation/screens/provider/earnings/payout_settings_screen.dart
 import '../../presentation/screens/provider/earnings/banking_details_screen.dart';
 import '../../presentation/screens/provider/profile/provider_profile_screen.dart';
 import '../../presentation/screens/help_support_screen.dart';
+import '../../presentation/screens/provider/profile/provider_documents_screen.dart';
 import '../../presentation/screens/provider/services/services_management_screen.dart';
 import '../../presentation/screens/provider/chat/chat_detail_screen.dart';
 
@@ -216,6 +217,11 @@ class AppRouter {
         path: '/provider-help-support',
         name: 'provider-help-support',
         builder: (context, state) => const HelpSupportScreen(),
+      ),
+      GoRoute(
+        path: '/provider-documents',
+        name: 'provider-documents',
+        builder: (context, state) => const ProviderDocumentsScreen(),
       ),
 
       // ── Services ────────────────────────────────────────────────
