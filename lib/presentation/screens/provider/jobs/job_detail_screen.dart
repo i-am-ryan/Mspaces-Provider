@@ -94,9 +94,42 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           .doc(widget.bookingId)
           .get();
       final data = bookingDoc.data()!;
-      final destLat = (data['latitude'] as num?)?.toDouble();
-      final destLng = (data['longitude'] as num?)?.toDouble();
-      final destAddress = data['address']?.toString() ?? '';
+      double? destLat = (data['latitude'] as num?)?.toDouble();
+      double? destLng = (data['longitude'] as num?)?.toDouble();
+      String destAddress = data['address']?.toString() ?? '';
+
+      // If booking has a propertyId, use property coordinates (landlord booked for tenant)
+      final propertyId = data['propertyId']?.toString() ?? '';
+      if (propertyId.isNotEmpty) {
+        try {
+          final propDoc = await FirebaseFirestore.instance
+              .collection('properties')
+              .doc(propertyId)
+              .get();
+          if (propDoc.exists) {
+            final propData = propDoc.data()!;
+            final addr = propData['address'] as Map<String, dynamic>?;
+            final propLat = (addr?['latitude'] as num?)?.toDouble() ??
+                (propData['latitude'] as num?)?.toDouble();
+            final propLng = (addr?['longitude'] as num?)?.toDouble() ??
+                (propData['longitude'] as num?)?.toDouble();
+            if (propLat != null && propLng != null) {
+              destLat = propLat;
+              destLng = propLng;
+            }
+            // Build full property address
+            if (addr != null) {
+              final street = addr['street']?.toString() ?? '';
+              final suburb = addr['suburb']?.toString() ?? '';
+              final city = addr['city']?.toString() ?? '';
+              final parts = [street, suburb, city].where((s) => s.isNotEmpty);
+              if (parts.isNotEmpty) destAddress = parts.join(', ');
+            }
+          }
+        } catch (e) {
+          debugPrint('[StartJourney] Property lookup failed: $e');
+        }
+      }
 
       await FirebaseFirestore.instance
           .collection('bookings')
