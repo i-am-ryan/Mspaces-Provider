@@ -892,82 +892,89 @@ class _StatementsTabState extends State<_StatementsTab> {
 
     await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Select Month'),
-        content: StatefulBuilder(
-          builder: (ctx, setDialog) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left),
-                    onPressed: () => setDialog(() => selectedYear--),
-                  ),
-                  Text('$selectedYear',
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold)),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right),
-                    onPressed: selectedYear < now.year
-                        ? () => setDialog(() => selectedYear++)
-                        : null,
-                  ),
-                ],
-              ),
-              GridView.count(
-                shrinkWrap: true,
-                crossAxisCount: 3,
-                childAspectRatio: 2,
-                children: List.generate(12, (i) {
-                  final month = i + 1;
-                  final isSelected = month == selectedMonth;
-                  final isFuture =
-                      selectedYear == now.year && month > now.month;
-                  return GestureDetector(
-                    onTap: isFuture
-                        ? null
-                        : () => setDialog(() => selectedMonth = month),
-                    child: Container(
-                      margin: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: isSelected ? Colors.black : Colors.transparent,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Center(
-                        child: Text(
-                          DateFormat('MMM').format(DateTime(2000, month)),
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: isFuture
-                                  ? Colors.grey[300]
-                                  : isSelected
-                                      ? Colors.white
-                                      : Colors.black),
-                        ),
-                      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) => AlertDialog(
+          title: const Text('Select Month'),
+          content: SizedBox(
+            width: 280,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: () => setDialog(() => selectedYear--),
                     ),
-                  );
-                }),
-              ),
-            ],
+                    Text('$selectedYear',
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold)),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: selectedYear < now.year
+                          ? () => setDialog(() => selectedYear++)
+                          : null,
+                    ),
+                  ],
+                ),
+                SizedBox(
+                  height: 200,
+                  child: GridView.count(
+                    crossAxisCount: 3,
+                    childAspectRatio: 2,
+                    children: List.generate(12, (i) {
+                      final month = i + 1;
+                      final isSelected = month == selectedMonth;
+                      final isFuture =
+                          selectedYear == now.year && month > now.month;
+                      return GestureDetector(
+                        onTap: isFuture
+                            ? null
+                            : () => setDialog(() => selectedMonth = month),
+                        child: Container(
+                          margin: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color:
+                                isSelected ? Colors.black : Colors.transparent,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Center(
+                            child: Text(
+                              DateFormat('MMM').format(DateTime(2000, month)),
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: isFuture
+                                      ? Colors.grey[300]
+                                      : isSelected
+                                          ? Colors.white
+                                          : Colors.black),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                setState(() =>
+                    _statementMonth = DateTime(selectedYear, selectedMonth, 1));
+              },
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black, foregroundColor: Colors.white),
+              child: const Text('Select'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              setState(() =>
-                  _statementMonth = DateTime(selectedYear, selectedMonth, 1));
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black, foregroundColor: Colors.white),
-            child: const Text('Select'),
-          ),
-        ],
       ),
     );
   }
