@@ -1,4 +1,4 @@
-import java.util.Properties
+﻿import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -22,12 +22,29 @@ android {
         jvmTarget = "17"
     }
 
+    // ADD FLAVOR DIMENSIONS
+    flavorDimensions += "environment"
+
     defaultConfig {
         applicationId = "com.mspaces.provider"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    // ADD PRODUCT FLAVORS (same applicationId - separated by google-services.json per flavor)
+    productFlavors {
+        create("staging") {
+            dimension = "environment"
+            versionNameSuffix = "-staging"
+            resValue("string", "app_name", "Mspaces Provider Staging")
+        }
+
+        create("production") {
+            dimension = "environment"
+            resValue("string", "app_name", "Mspaces Provider")
+        }
     }
 
     val keyPropertiesFile = rootProject.file("key.properties")

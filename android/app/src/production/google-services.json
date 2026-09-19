@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "659374540886",
+    "project_id": "mspaces-prod",
+    "storage_bucket": "mspaces-prod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:659374540886:android:0f0fc5beeae00b58af53f7",
+        "android_client_info": {
+          "package_name": "com.mspaces.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDUze3Qm2H6hFGSlI-NKd2vWiJVT4a-ctE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:659374540886:android:7db186a78af25407af53f7",
+        "android_client_info": {
+          "package_name": "com.mspaces.provider"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDUze3Qm2H6hFGSlI-NKd2vWiJVT4a-ctE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
