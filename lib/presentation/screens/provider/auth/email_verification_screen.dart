@@ -24,7 +24,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   bool _isVerifying = false;
   bool _isSending = false;
   bool _canResend = false;
-  int _resendCountdown = 30;
+  int _resendCountdown = 600;
   Timer? _countdownTimer;
   String? _errorMessage;
 
@@ -62,7 +62,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   void _startResendCountdown() {
     setState(() {
       _canResend = false;
-      _resendCountdown = 30;
+      _resendCountdown = 600;
     });
     _countdownTimer?.cancel();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -283,7 +283,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                                     decoration: TextDecoration.underline)),
                           )
                         : Text(
-                            'Resend code in ${_resendCountdown}s',
+                            'Resend code in ${(_resendCountdown ~/ 60).toString().padLeft(2, '0')}:${(_resendCountdown % 60).toString().padLeft(2, '0')}',
                             style: TextStyle(
                                 fontSize: 14, color: Colors.grey[500]),
                           ),

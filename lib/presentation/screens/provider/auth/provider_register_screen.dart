@@ -1,5 +1,5 @@
 // lib/presentation/screens/provider/auth/provider_register_screen.dart
-// Credentials only — services, location, and radius are collected in onboarding.
+// Credentials only â€” services, location, and radius are collected in onboarding.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -38,11 +38,12 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
     super.dispose();
   }
 
-  // ── Validation ──────────────────────────────────────────────────────────────
+  // â”€â”€ Validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   bool _validate() {
     final name = _fullNameCtrl.text.trim();
     final email = _emailCtrl.text.trim();
+    final phone = _phoneCtrl.text.trim();
     final pass = _passwordCtrl.text;
     final confirm = _confirmPasswordCtrl.text;
 
@@ -50,12 +51,29 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
       _showError('Please fill in all required fields.');
       return false;
     }
-    if (!email.contains('@')) {
+    final emailRegex = RegExp(r'^[\w\.\-]+@[\w\-]+\.[a-zA-Z]{2,}$');
+    if (!emailRegex.hasMatch(email)) {
       _showError('Please enter a valid email address.');
       return false;
     }
-    if (pass.length < 6) {
-      _showError('Password must be at least 6 characters.');
+    if (phone.isNotEmpty && !RegExp(r'^[0-9]{10}$').hasMatch(phone)) {
+      _showError('Please enter a valid 10-digit phone number.');
+      return false;
+    }
+    if (pass.length < 8) {
+      _showError('Password must be at least 8 characters.');
+      return false;
+    }
+    if (!RegExp(r'[A-Z]').hasMatch(pass)) {
+      _showError('Password must contain at least one capital letter.');
+      return false;
+    }
+    if (!RegExp(r'[0-9]').hasMatch(pass)) {
+      _showError('Password must contain at least one digit.');
+      return false;
+    }
+    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-+=\[\]\\/;`~]').hasMatch(pass)) {
+      _showError('Password must contain at least one special character.');
       return false;
     }
     if (pass != confirm) {
@@ -69,7 +87,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
     return true;
   }
 
-  // ── Register ────────────────────────────────────────────────────────────────
+  // â”€â”€ Register â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<void> _handleRegister() async {
     if (!_validate()) return;
@@ -115,18 +133,18 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
 
       final now = FieldValue.serverTimestamp();
 
-      // 3. users/{uid} — minimal record; onboarding fills address + prefs
+      // 3. users/{uid} â€” minimal record; onboarding fills address + prefs
       await FirebaseFirestore.instance.collection('users').doc(uid).set({
         'displayName': fullName,
         'email': email,
         'phone': phone,
         'userType': 'provider',
-        'onboardingCompleted': false, // ← onboarding sets this to true
+        'onboardingCompleted': false, // â† onboarding sets this to true
         'createdAt': now,
         'updatedAt': now,
       }, SetOptions(merge: true));
 
-      // 4. service_providers/{uid} — skeleton record; onboarding fills the rest
+      // 4. service_providers/{uid} â€” skeleton record; onboarding fills the rest
       await FirebaseFirestore.instance
           .collection('service_providers')
           .doc(uid)
@@ -153,7 +171,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
         'updatedAt': now,
       }, SetOptions(merge: true));
 
-      // 5. Send to OTP email verification → then onboarding
+      // 5. Send to OTP email verification â†’ then onboarding
       if (mounted) {
         context.go('/email-verification', extra: {'email': email});
       }
@@ -190,7 +208,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
     }
   }
 
-  // ── Build ───────────────────────────────────────────────────────────────────
+  // â”€â”€ Build â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   @override
   Widget build(BuildContext context) {
@@ -389,7 +407,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
     );
   }
 
-  // ── Header ──────────────────────────────────────────────────────────────────
+  // â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildHeader() {
     return SizedBox(
@@ -431,7 +449,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
     );
   }
 
-  // ── Reusable field ──────────────────────────────────────────────────────────
+  // â”€â”€ Reusable field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _field({
     required TextEditingController ctrl,

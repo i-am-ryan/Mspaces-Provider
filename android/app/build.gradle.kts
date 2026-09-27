@@ -1,4 +1,4 @@
-﻿import java.util.Properties
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -39,11 +39,13 @@ android {
             dimension = "environment"
             versionNameSuffix = "-staging"
             resValue("string", "app_name", "Mspaces Provider Staging")
+            manifestPlaceholders["mapsApiKey"] = "AIzaSyCUY_AWKCM8Nl5Dxuyknx4xMyNUCRYW3U4"
         }
 
         create("production") {
             dimension = "environment"
             resValue("string", "app_name", "Mspaces Provider")
+            manifestPlaceholders["mapsApiKey"] = "AIzaSyDUze3Qm2H6hFGSlI-NKd2vWiJVT4a-ctE"
         }
     }
 

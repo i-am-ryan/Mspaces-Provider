@@ -159,7 +159,7 @@ class _ProviderLoginScreenState extends State<ProviderLoginScreen> {
                 children: [
                   // Hero section with wave clipper
                   SizedBox(
-                    height: screenHeight * 0.45,
+                    height: screenHeight * 0.28,
                     child: Stack(
                       children: [
                         ClipPath(
