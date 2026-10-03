@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -88,6 +89,23 @@ class _ProviderLoginScreenState extends State<ProviderLoginScreen> {
           );
         }
         return;
+      }
+
+      // Block non-service-provider accounts from logging into the provider app
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
+        if (userDoc.exists && userDoc.data()?['userType'] != 'provider') {
+          await FirebaseAuth.instance.signOut();
+          if (mounted) {
+            _showError('This account is not registered as a Service Provider. '
+                'Please use the Mspaces app to log in.');
+          }
+          return;
+        }
       }
 
       if (mounted) context.go('/provider-dashboard');

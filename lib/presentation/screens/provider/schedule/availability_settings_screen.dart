@@ -18,6 +18,7 @@ class _AvailabilitySettingsScreenState
     extends State<AvailabilitySettingsScreen> {
   bool _isAvailable = true;
   bool _autoAccept = false;
+  bool _acceptsUrgentOutsideHours = false;
   int _maxJobsPerDay = 5;
   int _bufferTime = 30;
   bool _isLoading = true;
@@ -81,6 +82,7 @@ class _AvailabilitySettingsScreenState
         setState(() {
           _isAvailable = data['isAvailable'] as bool? ?? true;
           _autoAccept = availability['autoAccept'] as bool? ?? false;
+          _acceptsUrgentOutsideHours = availability['acceptsUrgentOutsideHours'] as bool? ?? false;
           _maxJobsPerDay =
               (availability['maxJobsPerDay'] as num?)?.toInt() ?? 5;
           _bufferTime = (availability['bufferTime'] as num?)?.toInt() ?? 30;
@@ -140,6 +142,7 @@ class _AvailabilitySettingsScreenState
         'isAvailable': _isAvailable,
         'availability': {
           'autoAccept': _autoAccept,
+          'acceptsUrgentOutsideHours': _acceptsUrgentOutsideHours,
           'maxJobsPerDay': _maxJobsPerDay,
           'bufferTime': _bufferTime,
           'weeklySchedule': weeklySchedule,
@@ -384,7 +387,7 @@ class _AvailabilitySettingsScreenState
                             color: isEnabled ? Colors.black : Colors.grey)),
                   ),
                   if (isEnabled)
-                    Text('${schedule['start']} – ${schedule['end']}',
+                    Text('${schedule['start']} Ã¢â‚¬â€œ ${schedule['end']}',
                         style: TextStyle(fontSize: 14, color: Colors.grey[600]))
                   else
                     Text('Unavailable',
@@ -441,6 +444,37 @@ class _AvailabilitySettingsScreenState
             Switch(
               value: _autoAccept,
               onChanged: (v) => setState(() => _autoAccept = v),
+              activeColor: Colors.black,
+            ),
+          ]),
+        ),
+        Divider(height: 1, color: Colors.grey[200]),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(10)),
+              child: Icon(Icons.priority_high, color: Colors.orange[700], size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Accept Urgent Requests',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w500)),
+                    Text('Allow urgent requests outside your working hours',
+                        style:
+                            TextStyle(fontSize: 12, color: Colors.grey[600])),
+                  ]),
+            ),
+            Switch(
+              value: _acceptsUrgentOutsideHours,
+              onChanged: (v) => setState(() => _acceptsUrgentOutsideHours = v),
               activeColor: Colors.black,
             ),
           ]),

@@ -1,6 +1,7 @@
 // lib/presentation/screens/provider/screens/dashboard/provider_dashboard_screen.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -15,15 +16,16 @@ class ProviderDashboardScreen extends StatefulWidget {
       _ProviderDashboardScreenState();
 }
 
-class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
+class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
+    with WidgetsBindingObserver {
   final _uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-  // ── Profile ──────────────────────────────────────────────────────────────
+  // â”€â”€ Profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   String _displayName = '';
   String _photoUrl = '';
   double _rating = 0;
 
-  // ── Stats ────────────────────────────────────────────────────────────────
+  // â”€â”€ Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   int _weekJobs = 0;
   double _weekEarnings = 0;
   int _pendingCount = 0;
@@ -35,14 +37,61 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadDashboard();
+    _refreshLiveLocationIfAvailable();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshLiveLocationIfAvailable();
+    }
+  }
+
+  // Keeps the provider's live location current so clients can find them
+  // wherever they are, without requiring a manual availability re-toggle.
+  Future<void> _refreshLiveLocationIfAvailable() async {
+    if (_uid.isEmpty) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('service_providers')
+          .doc(_uid)
+          .get();
+      final isAvailable = doc.data()?['isAvailable'] as bool? ?? false;
+      if (!isAvailable) return;
+
+      final perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+      await FirebaseFirestore.instance
+          .collection('service_providers')
+          .doc(_uid)
+          .update({
+        'liveLocation': {
+          'latitude': pos.latitude,
+          'longitude': pos.longitude,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadDashboard() async {
     if (_uid.isEmpty) return;
     setState(() => _loading = true);
     try {
-      // ── Profile ────────────────────────────────────────────────────────
+      // â”€â”€ Profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       final spSnap = await FirebaseFirestore.instance
           .collection('service_providers')
           .doc(_uid)
@@ -61,13 +110,13 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
       final ratingRaw = spData['averageRating'] ?? spData['rating'] ?? 0.0;
       final rating = ratingRaw is num ? ratingRaw.toDouble() : 0.0;
 
-      // ── This week range ────────────────────────────────────────────────
+      // â”€â”€ This week range â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       final now = DateTime.now();
       final weekStart = now.subtract(Duration(days: now.weekday - 1));
       final weekStartTs = Timestamp.fromDate(
           DateTime(weekStart.year, weekStart.month, weekStart.day));
 
-      // ── This week's active jobs — no date filter to avoid index issues ─
+      // â”€â”€ This week's active jobs â€” no date filter to avoid index issues â”€
       // We fetch all active and filter client-side by scheduledDate
       final activeSnap = await FirebaseFirestore.instance
           .collection('bookings')
@@ -93,7 +142,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
         }
       }
 
-      // ── Completed this week ────────────────────────────────────────────
+      // â”€â”€ Completed this week â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       final completedSnap = await FirebaseFirestore.instance
           .collection('bookings')
           .where('providerId', isEqualTo: _uid)
@@ -117,14 +166,14 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
         }
       }
 
-      // ── Pending bookings ───────────────────────────────────────────────
+      // â”€â”€ Pending bookings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       final pendingSnap = await FirebaseFirestore.instance
           .collection('bookings')
           .where('providerId', isEqualTo: _uid)
           .where('status',
               whereIn: ['pending', 'pending_provider_confirmation']).get();
 
-      // ── Pending quotes ─────────────────────────────────────────────────
+      // â”€â”€ Pending quotes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       int quoteCount = 0;
       try {
         final quoteSnap = await FirebaseFirestore.instance
@@ -176,7 +225,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     return first.isNotEmpty ? first : 'Provider';
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
+  // â”€â”€ Build â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   @override
   Widget build(BuildContext context) {
@@ -233,7 +282,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ── Hero banner ───────────────────────────────────
+                        // â”€â”€ Hero banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                         _buildHeroBanner(),
                         Padding(
                           padding: const EdgeInsets.all(20),
@@ -247,7 +296,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                             ],
                           ),
                         ),
-                        // ── Offers ────────────────────────────────────────
+                        // â”€â”€ Offers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                         const OffersCarousel(targetType: 'providers'),
                         const SizedBox(height: 80),
                       ],
@@ -259,7 +308,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     );
   }
 
-  // ── Hero Banner
+  // â”€â”€ Hero Banner
   Widget _buildHeroBanner() {
     final initials = _displayName
         .trim()
@@ -328,7 +377,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      '$_greeting, $_firstName! 👋',
+                      '$_greeting, $_firstName! ðŸ‘‹',
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -340,7 +389,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                     const SizedBox(height: 6),
                     Text(
                       _rating > 0
-                          ? '⭐ ${_rating.toStringAsFixed(1)} · Ready for new jobs'
+                          ? 'â­ ${_rating.toStringAsFixed(1)} Â· Ready for new jobs'
                           : 'Ready to take on new jobs',
                       style: TextStyle(
                         fontSize: 13,
@@ -402,7 +451,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     );
   }
 
-  // ── Stats Grid ────────────────────────────────────────────────────────────
+  // â”€â”€ Stats Grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildStatsGrid() {
     return Column(
@@ -515,7 +564,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     );
   }
 
-  // ── Quick Actions ─────────────────────────────────────────────────────────
+  // â”€â”€ Quick Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildQuickActions() {
     return Column(
