@@ -47,12 +47,12 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
   String _formatDate(dynamic ts) {
     if (ts is Timestamp)
-      return DateFormat('dd MMM yyyy · HH:mm').format(ts.toDate());
+      return DateFormat('dd MMM yyyy Â· HH:mm').format(ts.toDate());
     if (ts is String) {
       final d = DateTime.tryParse(ts);
-      if (d != null) return DateFormat('dd MMM yyyy · HH:mm').format(d);
+      if (d != null) return DateFormat('dd MMM yyyy Â· HH:mm').format(d);
     }
-    return '—';
+    return 'â€”';
   }
 
   String _formatAmount(dynamic v) {
@@ -201,7 +201,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
       final uid = FirebaseAuth.instance.currentUser?.uid;
 
-      // Write to booking (existing — for ETA tracking)
+      // Write to booking (existing â€” for ETA tracking)
       await FirebaseFirestore.instance
           .collection('bookings')
           .doc(widget.bookingId)
@@ -228,7 +228,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         });
       }
 
-      // Check if within 5 minutes — notify client
+      // Check if within 5 minutes â€” notify client
       final bookingDoc = await FirebaseFirestore.instance
           .collection('bookings')
           .doc(widget.bookingId)
@@ -742,7 +742,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   }
 
   Widget _buildClientCard(Map<String, dynamic> d) {
-    final clientName = d['clientName']?.toString() ?? '—';
+    final clientName = d['clientName']?.toString() ?? 'â€”';
     final clientPhone = d['clientPhone']?.toString() ?? '';
     final clientEmail = d['clientEmail']?.toString() ?? '';
     return _card(
@@ -831,7 +831,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
   Widget _buildLocationCard(Map<String, dynamic> d) {
     final address =
-        d['address']?.toString() ?? d['location']?.toString() ?? '—';
+        d['address']?.toString() ?? d['location']?.toString() ?? 'â€”';
     return _card(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Location',
@@ -861,8 +861,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   }
 
   Widget _buildPriceCard(Map<String, dynamic> d) {
-    final amount =
-        _formatAmount(d['total'] ?? d['estimatedPrice'] ?? d['amount']);
+    final isCancelled = d['status']?.toString() == 'cancelled';
+    final amount = isCancelled
+        ? _formatAmount(0)
+        : _formatAmount(d['total'] ?? d['estimatedPrice'] ?? d['amount']);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1053,7 +1055,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       ]),
       child: SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          // Pending provider confirmation — Confirm or Reschedule
+          // Pending provider confirmation â€” Confirm or Reschedule
           if (status == 'pending_provider_confirmation') ...[
             SizedBox(
               width: double.infinity,
@@ -1122,7 +1124,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             const SizedBox(height: 10),
           ],
 
-          // Start Journey button — only after payment
+          // Start Journey button â€” only after payment
           if (status == 'confirmed' || status == 'accepted') ...[
             Builder(builder: (context) {
               final paymentStatus = data['paymentStatus']?.toString() ?? '';
