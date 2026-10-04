@@ -47,12 +47,12 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
   String _formatDate(dynamic ts) {
     if (ts is Timestamp)
-      return DateFormat('dd MMM yyyy Ãƒâ€šÃ‚Â· HH:mm').format(ts.toDate());
+      return DateFormat('dd MMM yyyy · HH:mm').format(ts.toDate());
     if (ts is String) {
       final d = DateTime.tryParse(ts);
-      if (d != null) return DateFormat('dd MMM yyyy Ãƒâ€šÃ‚Â· HH:mm').format(d);
+      if (d != null) return DateFormat('dd MMM yyyy · HH:mm').format(d);
     }
-    return 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â';
+    return '—';
   }
 
   String _formatAmount(dynamic v) {
@@ -201,7 +201,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
       final uid = FirebaseAuth.instance.currentUser?.uid;
 
-      // Write to booking (existing ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â for ETA tracking)
+      // Write to booking (existing — for ETA tracking)
       await FirebaseFirestore.instance
           .collection('bookings')
           .doc(widget.bookingId)
@@ -228,7 +228,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         });
       }
 
-      // Check if within 5 minutes ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â notify client
+      // Check if within 5 minutes — notify client
       final bookingDoc = await FirebaseFirestore.instance
           .collection('bookings')
           .doc(widget.bookingId)
@@ -827,7 +827,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   }
 
   Widget _buildClientCard(Map<String, dynamic> d) {
-    final clientName = d['clientName']?.toString() ?? 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â';
+    final clientName = d['clientName']?.toString() ?? '—';
     final clientPhone = d['clientPhone']?.toString() ?? '';
     final clientEmail = d['clientEmail']?.toString() ?? '';
     return _card(
@@ -916,7 +916,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
   Widget _buildLocationCard(Map<String, dynamic> d) {
     final address =
-        d['address']?.toString() ?? d['location']?.toString() ?? 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â';
+        d['address']?.toString() ?? d['location']?.toString() ?? '—';
     return _card(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Location',
@@ -1140,7 +1140,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       ]),
       child: SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          // Pending provider confirmation ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Confirm or Reschedule
+          // Pending provider confirmation — Confirm or Reschedule
           if (status == 'pending_provider_confirmation') ...[
             SizedBox(
               width: double.infinity,
@@ -1209,7 +1209,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             const SizedBox(height: 10),
           ],
 
-          // Start Journey button ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â only after payment
+          // Start Journey button — only after payment
           if (status == 'confirmed' || status == 'accepted') ...[
             Builder(builder: (context) {
               final paymentStatus = data['paymentStatus']?.toString() ?? '';

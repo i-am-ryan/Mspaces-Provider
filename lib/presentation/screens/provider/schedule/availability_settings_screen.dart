@@ -387,7 +387,7 @@ class _AvailabilitySettingsScreenState
                             color: isEnabled ? Colors.black : Colors.grey)),
                   ),
                   if (isEnabled)
-                    Text('${schedule['start']} Ã¢â‚¬â€œ ${schedule['end']}',
+                    Text('${schedule['start']} – ${schedule['end']}',
                         style: TextStyle(fontSize: 14, color: Colors.grey[600]))
                   else
                     Text('Unavailable',
