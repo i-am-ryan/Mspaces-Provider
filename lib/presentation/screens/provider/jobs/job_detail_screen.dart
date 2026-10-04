@@ -47,12 +47,12 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
   String _formatDate(dynamic ts) {
     if (ts is Timestamp)
-      return DateFormat('dd MMM yyyy Â· HH:mm').format(ts.toDate());
+      return DateFormat('dd MMM yyyy Ãƒâ€šÃ‚Â· HH:mm').format(ts.toDate());
     if (ts is String) {
       final d = DateTime.tryParse(ts);
-      if (d != null) return DateFormat('dd MMM yyyy Â· HH:mm').format(d);
+      if (d != null) return DateFormat('dd MMM yyyy Ãƒâ€šÃ‚Â· HH:mm').format(d);
     }
-    return 'â€”';
+    return 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â';
   }
 
   String _formatAmount(dynamic v) {
@@ -201,7 +201,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
       final uid = FirebaseAuth.instance.currentUser?.uid;
 
-      // Write to booking (existing â€” for ETA tracking)
+      // Write to booking (existing ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â for ETA tracking)
       await FirebaseFirestore.instance
           .collection('bookings')
           .doc(widget.bookingId)
@@ -228,7 +228,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         });
       }
 
-      // Check if within 5 minutes â€” notify client
+      // Check if within 5 minutes ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â notify client
       final bookingDoc = await FirebaseFirestore.instance
           .collection('bookings')
           .doc(widget.bookingId)
@@ -505,6 +505,77 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     }
   }
 
+  void _showCancelJobDialog() {
+    final reasonCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Cancel Job'),
+        content: SingleChildScrollView(
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'The client will be notified with your reason and receive a full refund. '
+                  'The amount previously credited to you for this job will be deducted from your balance.',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: reasonCtrl,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: 'Reason for cancellation *',
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ]),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Keep Job', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final reason = reasonCtrl.text.trim();
+              if (reason.isEmpty) {
+                _snack('Please provide a reason for cancelling', error: true);
+                return;
+              }
+              Navigator.pop(ctx);
+              setState(() => _isUpdating = true);
+              try {
+                final result =
+                    await FirebaseFunctions.instanceFor(region: 'europe-west4')
+                        .httpsCallable('cancelBookingByProvider')
+                        .call({
+                  'bookingId': widget.bookingId,
+                  'reason': reason,
+                });
+                _snack(result.data['message']?.toString() ?? 'Job cancelled');
+              } on FirebaseFunctionsException catch (e) {
+                _snack(e.message ?? 'Unable to cancel job', error: true);
+              } catch (e) {
+                _snack('Unable to cancel job. Please try again.', error: true);
+              } finally {
+                if (mounted) setState(() => _isUpdating = false);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Cancel Job'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showCompletionDialog() {
     showDialog(
       context: context,
@@ -640,6 +711,20 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   ]),
                 ),
               ),
+              if (status != 'completed' && status != 'cancelled')
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: Colors.black),
+                  onSelected: (v) {
+                    if (v == 'cancel') _showCancelJobDialog();
+                  },
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(
+                      value: 'cancel',
+                      child: Text('Cancel Job',
+                          style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
             ],
           ),
           body: SingleChildScrollView(
@@ -742,7 +827,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   }
 
   Widget _buildClientCard(Map<String, dynamic> d) {
-    final clientName = d['clientName']?.toString() ?? 'â€”';
+    final clientName = d['clientName']?.toString() ?? 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â';
     final clientPhone = d['clientPhone']?.toString() ?? '';
     final clientEmail = d['clientEmail']?.toString() ?? '';
     return _card(
@@ -831,7 +916,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
   Widget _buildLocationCard(Map<String, dynamic> d) {
     final address =
-        d['address']?.toString() ?? d['location']?.toString() ?? 'â€”';
+        d['address']?.toString() ?? d['location']?.toString() ?? 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â';
     return _card(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Location',
@@ -1055,7 +1140,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       ]),
       child: SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          // Pending provider confirmation â€” Confirm or Reschedule
+          // Pending provider confirmation ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Confirm or Reschedule
           if (status == 'pending_provider_confirmation') ...[
             SizedBox(
               width: double.infinity,
@@ -1124,7 +1209,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             const SizedBox(height: 10),
           ],
 
-          // Start Journey button â€” only after payment
+          // Start Journey button ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â only after payment
           if (status == 'confirmed' || status == 'accepted') ...[
             Builder(builder: (context) {
               final paymentStatus = data['paymentStatus']?.toString() ?? '';
