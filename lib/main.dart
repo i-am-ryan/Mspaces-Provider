@@ -12,7 +12,12 @@ void main() async {
     debugPrint('Firebase init: $e');
   }
 
-  await NotificationService.initialize();
+  // Never let notification setup block the app from opening
+  try {
+    await NotificationService.initialize();
+  } catch (e) {
+    debugPrint('Notification init: $e');
+  }
 
   // Handle notification tap routing
   NotificationService.onNotificationTap = (payload) {

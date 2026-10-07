@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 // Top-level handler required by firebase_messaging for background messages
@@ -50,8 +51,11 @@ class NotificationService {
       },
     );
 
-    // Save token once on startup
-    await saveToken();
+    // Save token for the current session and on every sign-in. Not awaited:
+    // on iOS it can wait for the APNs token and must not delay startup.
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user != null) saveToken();
+    });
 
     // Refresh token whenever FCM rotates it
     FirebaseMessaging.instance.onTokenRefresh.listen((_) => saveToken());
@@ -95,23 +99,44 @@ class NotificationService {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    final token = await FirebaseMessaging.instance.getToken();
-    if (token == null) return;
+    try {
+      // iOS: getToken() throws until APNs has issued its token, which can
+      // lag behind app start. Wait for it briefly.
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        String? apnsToken;
+        for (var i = 0; i < 10 && apnsToken == null; i++) {
+          apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+          if (apnsToken == null) {
+            await Future.delayed(const Duration(seconds: 1));
+          }
+        }
+        if (apnsToken == null) {
+          debugPrint('[FCM] APNs token not available; token not saved');
+          return;
+        }
+      }
 
-    final tokenData = {'fcmToken': token};
-    final firestore = FirebaseFirestore.instance;
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token == null) return;
 
-    // Write to both collections; use set+merge so missing docs don't error
-    await Future.wait([
-      firestore
-          .collection('users')
-          .doc(uid)
-          .set(tokenData, SetOptions(merge: true)),
-      firestore
-          .collection('service_providers')
-          .doc(uid)
-          .set(tokenData, SetOptions(merge: true)),
-    ]);
+      final tokenData = {'fcmToken': token};
+      final firestore = FirebaseFirestore.instance;
+
+      // Write to both collections; use set+merge so missing docs don't error
+      await Future.wait([
+        firestore
+            .collection('users')
+            .doc(uid)
+            .set(tokenData, SetOptions(merge: true)),
+        firestore
+            .collection('service_providers')
+            .doc(uid)
+            .set(tokenData, SetOptions(merge: true)),
+      ]);
+      debugPrint('[FCM] Token saved for provider: $uid');
+    } catch (e) {
+      debugPrint('[FCM] Error saving token: $e');
+    }
   }
 
   static void Function(String? payload)? onNotificationTap;
