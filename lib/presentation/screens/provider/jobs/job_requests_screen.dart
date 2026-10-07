@@ -73,33 +73,11 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
       final status = (doc.data() as Map?)?['status']?.toString() ?? '';
 
       if (status == 'pending_provider_confirmation') {
-        // Return visit confirmation — just update status, no invoice
-        await FirebaseFirestore.instance
-            .collection('bookings')
-            .doc(bookingId)
-            .update({
-          'status': 'confirmed',
-          'returnVisitConfirmedAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        // Notify client
-        final data = doc.data() as Map<String, dynamic>;
-        final clientId =
-            data['clientId']?.toString() ?? data['userId']?.toString() ?? '';
-        if (clientId.isNotEmpty) {
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(clientId)
-              .collection('notifications')
-              .add({
-            'title': 'Return Visit Confirmed',
-            'body': 'Your provider has confirmed the return visit date.',
-            'type': 'return_visit_confirmed',
-            'bookingId': bookingId,
-            'read': false,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-        }
+        // Accepted quote — CF confirms and generates the deposit invoice
+        // when the quote requires one (same as the job detail screen)
+        final callable = FirebaseFunctions.instanceFor(region: 'europe-west4')
+            .httpsCallable('confirmBookingDate');
+        await callable.call({'bookingId': bookingId});
       } else {
         // Initial booking confirmation — call CF which generates INV-COF
         final callable = FirebaseFunctions.instanceFor(region: 'europe-west4')
