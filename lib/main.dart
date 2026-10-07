@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'core/services/notification_service.dart';
@@ -40,6 +42,34 @@ void main() async {
         break;
       case 'requests':
         router.push('/provider-job-requests');
+        break;
+      case 'chat':
+        if (id.isEmpty) {
+          router.push('/provider-notifications');
+          break;
+        }
+        FirebaseFirestore.instance
+            .collection('conversations')
+            .doc(id)
+            .get()
+            .then((doc) {
+          final conv = doc.data();
+          final uid = FirebaseAuth.instance.currentUser?.uid;
+          final otherRole = conv == null
+              ? ''
+              : ['client', 'provider', 'tenant', 'landlord'].firstWhere(
+                  (r) => conv['${r}Id'] != null && conv['${r}Id'] != uid,
+                  orElse: () => '');
+          if (otherRole.isEmpty) {
+            router.push('/provider-notifications');
+            return;
+          }
+          router.push('/provider-chat-detail', extra: {
+            'conversationId': id,
+            'otherName': conv!['${otherRole}Name']?.toString() ?? '',
+            'otherRole': otherRole,
+          });
+        });
         break;
       case 'notifications':
       default:

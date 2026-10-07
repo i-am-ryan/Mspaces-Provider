@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/services/notification_service.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final String conversationId;
@@ -31,11 +32,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   @override
   void initState() {
     super.initState();
+    NotificationService.activeConversationId = widget.conversationId;
     _markAsRead();
   }
 
   @override
   void dispose() {
+    if (NotificationService.activeConversationId == widget.conversationId) {
+      NotificationService.activeConversationId = null;
+    }
     _msgCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();

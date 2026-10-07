@@ -14,6 +14,10 @@ class NotificationService {
   static final FlutterLocalNotificationsPlugin _local =
       FlutterLocalNotificationsPlugin();
 
+  /// Conversation currently open in the chat screen; its message pushes are
+  /// not shown as foreground banners.
+  static String? activeConversationId;
+
   static const _androidChannel = AndroidNotificationChannel(
     'mspaces_provider_channel',
     'Mspaces Provider',
@@ -88,6 +92,9 @@ class NotificationService {
       case 'new_job_request':
         payload = 'requests';
         break;
+      case 'new_message':
+        payload = 'chat:${data['conversationId'] ?? ''}';
+        break;
       default:
         payload = 'notifications';
     }
@@ -145,6 +152,12 @@ class NotificationService {
     final notification = message.notification;
     final data = message.data;
 
+    if (data['type'] == 'new_message' &&
+        data['conversationId'] != null &&
+        data['conversationId'] == activeConversationId) {
+      return;
+    }
+
     String? title = notification?.title ?? data['title'];
     String? body = notification?.body ?? data['body'];
 
@@ -184,7 +197,9 @@ class NotificationService {
       id: notification?.hashCode ?? message.messageId.hashCode,
       title: title,
       body: body,
-      payload: data['bookingId'] ?? data['invoiceId'] ?? data['quoteRequestId'],
+      payload: data['type'] == 'new_message'
+          ? 'chat:${data['conversationId'] ?? ''}'
+          : data['bookingId'] ?? data['invoiceId'] ?? data['quoteRequestId'],
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _androidChannel.id,
