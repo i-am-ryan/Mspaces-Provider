@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Mspaces uses your location to set your service area and show clients how far you are from their job.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Mspaces uses your location to set your service area and show clients how far you are from their job.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
