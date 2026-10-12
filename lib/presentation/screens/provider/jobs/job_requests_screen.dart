@@ -1420,6 +1420,11 @@ class _JobRequestsScreenState extends State<JobRequestsScreen>
         statusLabel = 'Accepted';
         statusIcon = Icons.check_circle_outline;
         break;
+      case 'expired':
+        statusColor = Colors.grey;
+        statusLabel = 'Expired';
+        statusIcon = Icons.hourglass_disabled;
+        break;
       case 'declined':
       case 'provider_declined':
         statusColor = Colors.red;
