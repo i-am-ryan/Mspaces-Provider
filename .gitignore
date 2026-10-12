@@ -46,3 +46,9 @@ app.*.map.json
 # local build-inspection leftovers
 aab-extracted/
 app-production-release.zip
+
+# never commit stray projects or secrets
+Downloads/
+.env
+*.p8
+serviceAccount*.json
